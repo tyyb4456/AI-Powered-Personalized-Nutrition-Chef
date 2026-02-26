@@ -1,87 +1,79 @@
+"""
+main.py
+
+Entry point for the Personalized Nutrition Chef pipeline.
+"""
+
 from graph_builder import graph
 from state import NutritionState
 
+
+def print_recipe(recipe) -> None:
+    if recipe is None:
+        print("No recipe available.")
+        return
+
+    print(f"\n🍽️  {recipe.dish_name}")
+    if recipe.cuisine:
+        print(f"   Cuisine: {recipe.cuisine}")
+    if recipe.prep_time_minutes:
+        print(f"   Prep time: {recipe.prep_time_minutes} min")
+
+    print("\n🧾 Ingredients:")
+    for ing in recipe.ingredients:
+        print(f"   - {ing.quantity}  {ing.name}")
+
+    print("\n👨‍🍳 Steps:")
+    for i, step in enumerate(recipe.steps, 1):
+        print(f"   {i}. {step}")
+
+    print("\n📊 Nutrition:")
+    n = recipe.nutrition
+    print(f"   Calories:  {n.calories} kcal")
+    print(f"   Protein:   {n.protein_g}g")
+    print(f"   Carbs:     {n.carbs_g}g")
+    print(f"   Fat:       {n.fat_g}g")
+    if n.fiber_g is not None:
+        print(f"   Fiber:     {n.fiber_g}g")
+
+
 if __name__ == "__main__":
-    print("🍽️ Starting Personalized Nutrition Chef...\n")
-    raw_state = graph.invoke(NutritionState())
-    
-    # Convert to NutritionState
-    final_state = NutritionState(**raw_state)
+    print("🍽️  Starting Personalized Nutrition Chef...\n")
 
-    print("\n🍳 Final Personalized Recipe:\n")
-    print(final_state.generated_recipe)
-    print("\n----------------------------------------------------\n")
-    print("\n📊 Nutrition Information:\n")
-    if final_state.recipe_nutrition:
-        for nutrient, value in final_state.recipe_nutrition.items():
-            print(f"{nutrient.capitalize()}: {value}")
-    else:
-        print("No nutrition information available.")
+    raw = graph.invoke(NutritionState())
+    state = NutritionState(**raw)
 
-    print("\n----------------------------------------------------\n")
+    # ── Final Recipe ──────────────────────────────────────────────────────────
+    print("\n" + "="*60)
+    print("FINAL PERSONALIZED RECIPE")
+    print("="*60)
+    print_recipe(state.final_recipe)
 
-    print("revise recipe:\n\n", final_state.revised_recipe)
+    # ── Validation summary ────────────────────────────────────────────────────
+    print("\n" + "="*60)
+    print("NUTRITION VALIDATION")
+    print("="*60)
+    if state.validation_result:
+        print(state.validation_notes)
 
-    print("\n----------------------------------------------------\n")
+    # ── Substitutions ─────────────────────────────────────────────────────────
+    if state.substitutions_made and state.substitution_output:
+        print("\n" + "="*60)
+        print("SUBSTITUTIONS MADE")
+        print("="*60)
+        for sub in state.substitution_output.substitutions:
+            print(f"  {sub.original_ingredient} → {sub.substitute_ingredient}")
+            print(f"  Reason: {sub.reason}\n")
 
-    print("explanation:\n\n", final_state.recipe_explanation)
+    # ── Explanation ───────────────────────────────────────────────────────────
+    print("\n" + "="*60)
+    print("WHY THIS RECIPE?")
+    print("="*60)
+    print(state.recipe_explanation or "No explanation generated.")
 
-
-
-# from tools.macro_calculator import macro_calculator_tool
-
-# input_data = {
-#     "age": 25,
-#     "gender": "male",
-#     "weight": 70,
-#     "height": 175,
-#     "activity_level": "moderate",
-#     "goal": "gain muscle"
-# }
-
-# result = macro_calculator_tool.func(input_data)
-# print("Macro Calculator Result:")
-# print(result)
-
-# from tools.calorie_estimator import calorie_estimator_tool
-
-# result = calorie_estimator_tool.func({
-#     "ingredients": [
-#         "100g chicken breast",
-#         "1 cup brown rice",
-#         "1 tbsp olive oil",
-#         "1 cup broccoli"
-#     ]
-# })
-
-# print(result)
-
-# from tools.allergen_checker import allergen_checker_tool
-
-# result = allergen_checker_tool.func({
-#     "ingredients": [
-#         "peanut butter",
-#         "whole wheat bread",
-#         "cheddar cheese",
-#         "egg"
-#     ],
-#     "allergies": ["peanuts", "egg"],
-#     "preferences": ["cheese"]
-# })
-
-# print(result)
-
-# from tools.goal_recommender import goal_recommender_tool
-
-# user_profile = {
-#     "age": 28,
-#     "weight": 55,
-#     "height": 172,
-#     "activity_level": "low",
-#     "personal_goal": "YES"
-# }
-
-# recommended = goal_recommender_tool.func(user_profile)
-# print(f"🎯 Suggested Fitness Goal: {recommended}")
-
-
+    # ── Feedback ──────────────────────────────────────────────────────────────
+    print("\n" + "="*60)
+    print("YOUR FEEDBACK")
+    print("="*60)
+    print(f"Rating: {'⭐' * (state.feedback_rating or 0)}")
+    print(f"Comment: {state.feedback_comment or 'None'}")

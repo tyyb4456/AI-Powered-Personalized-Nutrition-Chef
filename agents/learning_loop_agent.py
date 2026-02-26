@@ -1,50 +1,35 @@
-from state import NutritionState
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
+"""
+agents/learning_loop_agent.py
+"""
 
+from state import NutritionState
+from langchain.chat_models import init_chat_model
+from langchain_core.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# 💬 LLM Setup (Groq + DeepSeek LLaMA)
-llm = ChatGroq(
-    model="meta-llama/llama-4-maverick-17b-128e-instruct",
-    temperature=0.5
-)
+model = init_chat_model("google_genai:gemini-2.5-flash")
 
-learning_prompt = ChatPromptTemplate.from_template("""
-You are a Learning Agent in an AI chef system.
+with open("prompts/learning_prompt.txt", "r", encoding="utf-8") as f:
+    raw_prompt = f.read()
 
-Based on the user feedback below, extract insights to improve future meals.
+learning_prompt = ChatPromptTemplate.from_template(raw_prompt)
 
-Feedback:
-Rating: {rating}
-Comment: {comment}
 
-User preferences: {preferences}
-Original goal: {goal}
+def learning_loop_agent_node(state: NutritionState) -> dict:
+    print("\n🔁 Learning from feedback...")
 
-Return:
-- Updated preferences
-- Adjusted interpretation of the user's fitness goal (if necessary)
-""")
-
-def learning_loop_agent_node(state: NutritionState) -> NutritionState:
-    print("\n🔁 Learning from feedback to adapt future recommendations...")
-
-    prompt = learning_prompt.format_messages(
+    messages = learning_prompt.format_messages(
         rating=state.feedback_rating,
-        comment=state.feedback_comment,
+        comment=state.feedback_comment or "No comment.",
         preferences=state.preferences,
-        goal=state.fitness_goal
+        goal=state.fitness_goal,
     )
 
-    response = llm.invoke(prompt)
-    insights = response.content
+    response = model.invoke(messages)
 
-    state = {
-        "learned_preferences": {"insights": insights},
-        "updated_goals": state.fitness_goal  # Future: could adapt this
+    return {
+        "learned_preferences": {"insights": response.content},
+        "updated_goals": state.fitness_goal,
     }
-
-    return state 

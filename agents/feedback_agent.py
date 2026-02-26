@@ -1,18 +1,26 @@
+"""
+agents/feedback_agent.py
+"""
+
 from state import NutritionState
 
-def feedback_agent_node(state: NutritionState) -> NutritionState:
+
+def feedback_agent_node(state: NutritionState) -> dict:
     print("\n🧪 Collecting feedback on the meal...")
 
-    # Simulated feedback – replace with UI input in production
-    print("\nHow would you rate this recipe (1–5)?")
-    rating = int(input("⭐ Rating: "))
+    while True:
+        try:
+            rating = int(input("⭐ Rate the recipe (1–5): ").strip())
+            if 1 <= rating <= 5:
+                break
+            print("   ⚠️ Please enter a number between 1 and 5.")
+        except ValueError:
+            print("   ⚠️ Invalid input. Enter a number.")
 
-    print("Any comments or suggestions?")
-    comment = input("📝 Comment: ")
+    comment = input("📝 Any comments or suggestions? ").strip()
 
-    state = {
-        "feedback_rating": rating,
-        "feedback_comment": comment,
-        "feedback_collected": True
+    return {
+        "feedback_rating":   rating,
+        "feedback_comment":  comment,
+        "feedback_collected": True,
     }
-    return state

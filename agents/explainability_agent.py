@@ -1,52 +1,84 @@
-from state import NutritionState
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
+"""
+agents/explainability_agent.py
 
+Explains why this specific recipe was chosen for this specific user.
+
+Key changes from original:
+- Uses state.final_recipe (the definitive final recipe) instead of
+  manually checking revised_recipe vs generated_recipe
+- Still uses free text output here — explanation is meant to be
+  human-readable prose, not structured data
+- Returns only keys this agent modifies
+"""
+
+from state import NutritionState
+from langchain.chat_models import init_chat_model
+from langchain_core.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# 💬 LLM Setup (Groq + DeepSeek LLaMA)
-llm = ChatGroq(
-    model="deepseek-r1-distill-llama-70b",
-    temperature=0.5
-)
+model = init_chat_model("google_genai:gemini-2.5-flash")
 
-explanation_prompt = ChatPromptTemplate.from_template("""
-You are an AI Nutrition Assistant.
 
-Explain why the following recipe was selected for the user, based on:
-1. Their fitness goal: {fitness_goal}
-2. Calorie target: {calorie_target}
-3. Macronutrient distribution: {macro_split}
-4. Preferences: {preferences}
-5. Allergies: {allergies}
-6. Substitutions made: {substitutions_made}
+EXPLANATION_PROMPT = ChatPromptTemplate.from_template("""
+You are an AI Nutrition Assistant. Explain this meal choice to the customer
+in friendly, science-backed language.
 
-Recipe:
-{recipe}
+🧑‍🍳 Customer Profile:
+- Fitness Goal: {fitness_goal}
+- Calorie Target: {calorie_target} kcal
+- Macro Split: Protein {protein_pct}% | Carbs {carbs_pct}% | Fat {fat_pct}%
+- Preferences: {preferences}
+- Allergies: {allergies}
+- Substitutions made: {substitutions_made}
+
+🍽️ Final Recipe: {dish_name}
+Ingredients: {ingredients}
+Nutrition: {calories} kcal | Protein {protein}g | Carbs {carbs}g | Fat {fat}g
+
+✅ Cover in your explanation:
+1. How this recipe supports their fitness goal
+2. Why the calorie and macro balance is appropriate for them
+3. How their preferences and allergen restrictions were respected
+4. The reason for any ingredient substitutions (if any were made)
+5. Why this is a smart, personalized choice overall
+
+Keep tone friendly, professional, and easy to understand.
 """)
 
-def explainability_agent_node(state: NutritionState) -> NutritionState:
-    print("\n🧠 Explaining recipe selection...")
 
-    recipe_to_explain = state.revised_recipe if state.substitutions_made else state.generated_recipe
+def explainability_agent_node(state: NutritionState) -> dict:
+    print("\n🧠 Generating recipe explanation...")
 
-    prompt = explanation_prompt.format_messages(
-        fitness_goal=state.fitness_goal,
-        calorie_target=state.calorie_target,
-        macro_split=state.macro_split,
-        preferences=state.preferences,
-        allergies=state.allergies,
-        substitutions_made=state.substitutions_made,
-        recipe=recipe_to_explain
+    recipe = state.final_recipe
+    if recipe is None:
+        return {"recipe_explanation": "No recipe available to explain."}
+
+    macro = state.macro_split
+    nutrition = recipe.nutrition
+    ingredients_text = ", ".join(
+        f"{ing.quantity} {ing.name}" for ing in recipe.ingredients
     )
 
-    response = llm.invoke(prompt)
-    explanation = response.content
+    messages = EXPLANATION_PROMPT.format_messages(
+        fitness_goal=state.fitness_goal,
+        calorie_target=state.calorie_target,
+        protein_pct=macro.protein,
+        carbs_pct=macro.carbs,
+        fat_pct=macro.fat,
+        preferences=state.preferences or "none",
+        allergies=state.allergies or "none",
+        substitutions_made=state.substitutions_made,
+        dish_name=recipe.dish_name,
+        ingredients=ingredients_text,
+        calories=nutrition.calories,
+        protein=nutrition.protein_g,
+        carbs=nutrition.carbs_g,
+        fat=nutrition.fat_g,
+    )
 
-    state = {
-        "recipe_explanation": explanation
-    }
+    response = model.invoke(messages)
+    print(response)
 
-    return state
+    return {"recipe_explanation": response.content}
