@@ -42,7 +42,9 @@ def learning_loop_agent_node(state: NutritionState) -> NutritionState:
     response = llm.invoke(prompt)
     insights = response.content
 
-    return {
+    state = {
         "learned_preferences": {"insights": insights},
         "updated_goals": state.fitness_goal  # Future: could adapt this
     }
+
+    return state 

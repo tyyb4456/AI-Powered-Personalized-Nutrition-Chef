@@ -10,8 +10,9 @@ def feedback_agent_node(state: NutritionState) -> NutritionState:
     print("Any comments or suggestions?")
     comment = input("📝 Comment: ")
 
-    return state.copy(update={
+    state = {
         "feedback_rating": rating,
         "feedback_comment": comment,
         "feedback_collected": True
-    })
+    }
+    return state

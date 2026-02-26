@@ -1,0 +1,9 @@
+langchain
+langgraph
+pydantic
+pydantic-settings
+tenacity
+python-dotenv
+langsmith
+pytest
+pytest-asyncio

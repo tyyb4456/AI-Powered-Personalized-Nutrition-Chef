@@ -1,3 +1,4 @@
+
 from state import NutritionState
 
 def profile_agent_node(state: NutritionState) -> NutritionState:
@@ -44,12 +45,13 @@ def profile_agent_node(state: NutritionState) -> NutritionState:
     #     "preferences": preferences
     # })
 
-    return NutritionState(
-        name=name,
-        age=age,
-        allergies=allergies,
-        preferences=preferences,
-        fitness_goal=fitness_goal,
-        profile_collected=True,
+    state = {
+        "name" : name,
+        "age" : age,
+        "allergies" : allergies,
+        "preferences" : preferences,
+        "fitness_goal" : fitness_goal,
+        "profile_collected" : True,
+    }
 
-    )
+    return state

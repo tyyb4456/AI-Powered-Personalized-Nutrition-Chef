@@ -45,6 +45,8 @@ def explainability_agent_node(state: NutritionState) -> NutritionState:
     response = llm.invoke(prompt)
     explanation = response.content
 
-    return {
+    state = {
         "recipe_explanation": explanation
     }
+
+    return state
