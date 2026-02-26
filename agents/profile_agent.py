@@ -1,19 +1,22 @@
 """
 agents/profile_agent.py
 
-Collects the customer profile via CLI input.
-
-Key changes from original:
-- Collects gender, weight, height, activity_level (needed for accurate BMR)
-- Input validation for numeric fields (no bare crashes on bad input)
-- Returns full NutritionState directly (profile agent is the entry point,
-  so it initializes state — other agents return partial dicts)
+Phase 2 upgrades:
+- Collects medical conditions (diabetes, hypertension, etc.)
+- Input validation for all numeric fields
+- hardcoded test values — proper interactive CLI is in comments
+- Returns NutritionState (profile is entry point, initialises full state)
 """
 
 from state import NutritionState
-
+from schemas.nutrition_schemas import MedicalCondition, MedicalConditionType
 
 ACTIVITY_OPTIONS = ["sedentary", "light", "moderate", "active", "very_active"]
+
+VALID_CONDITIONS: list[MedicalConditionType] = [
+    "diabetes", "hypertension", "celiac", "lactose_intolerance",
+    "kidney_disease", "heart_disease", "ibs", "anemia", "osteoporosis",
+]
 
 
 def _get_float(prompt: str, default: float) -> float:
@@ -27,11 +30,26 @@ def _get_float(prompt: str, default: float) -> float:
 def _get_int(prompt: str, default: int) -> int:
     try:
         return int(input(prompt).strip())
-
     except ValueError:
         print(f"   ⚠️ Invalid input. Using default: {default}")
         return default
+    
+def _collect_medical_conditions() -> list[MedicalCondition]:
+    print(f"\n   Available conditions: {', '.join(VALID_CONDITIONS)}")
+    raw = input("   Any medical conditions? (comma-separated, or 'none'): ").strip().lower()
 
+    if raw == "none" or not raw:
+        return []
+
+    conditions = []
+    for item in raw.split(","):
+        item = item.strip().replace(" ", "_")
+        if item in VALID_CONDITIONS:
+            conditions.append(MedicalCondition(condition=item))  # type: ignore[arg-type]
+        else:
+            print(f"   ⚠️ Unknown condition '{item}' — skipped.")
+
+    return conditions
 
 def profile_agent_node(state: NutritionState) -> NutritionState:
     print("\n👤 Collecting Customer Profile...")
@@ -59,6 +77,11 @@ def profile_agent_node(state: NutritionState) -> NutritionState:
     # activity_raw = input("Activity level: ").strip().lower().replace(" ", "_")
     activity_raw = "very_active"
     activity_level = activity_raw if activity_raw in ACTIVITY_OPTIONS else "moderate"
+
+    # ── Medical conditions (Phase 2) ──────────────────────────────────────────
+    print("\n⚕️  Medical Conditions")
+    medical_conditions = _collect_medical_conditions()
+
 
     # ── Allergies ─────────────────────────────────────────────────────────────
     # allergies_raw = input("Allergies (comma-separated, or 'none'): ").strip()
@@ -90,8 +113,9 @@ def profile_agent_node(state: NutritionState) -> NutritionState:
     preferences = {"spice_level": spice_level, "cuisine": cuisine}
 
     print(f"\n✅ Profile collected for {name}.")
+    if medical_conditions:
+        print(f"   ⚕️  Conditions: {', '.join(c.condition for c in medical_conditions)}")
 
-    # ── Profile agent initializes the full state ──────────────────────────────
     return NutritionState(
         name=name,
         age=age,
@@ -99,6 +123,7 @@ def profile_agent_node(state: NutritionState) -> NutritionState:
         weight_kg=weight_kg,
         height_cm=height_cm,
         activity_level=activity_level,
+        medical_conditions=medical_conditions,
         allergies=allergies,
         preferences=preferences,
         fitness_goal=fitness_goal,

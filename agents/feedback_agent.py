@@ -20,7 +20,7 @@ def feedback_agent_node(state: NutritionState) -> dict:
     comment = input("📝 Any comments or suggestions? ").strip()
 
     return {
-        "feedback_rating":   rating,
-        "feedback_comment":  comment,
+        "feedback_rating":    rating,
+        "feedback_comment":   comment,
         "feedback_collected": True,
     }

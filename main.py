@@ -1,7 +1,5 @@
 """
-main.py
-
-Entry point for the Personalized Nutrition Chef pipeline.
+main.py — Phase 2
 """
 
 from graph_builder import graph
@@ -15,7 +13,9 @@ def print_recipe(recipe) -> None:
 
     print(f"\n🍽️  {recipe.dish_name}")
     if recipe.cuisine:
-        print(f"   Cuisine: {recipe.cuisine}")
+        print(f"   Cuisine:   {recipe.cuisine}")
+    if recipe.meal_type:
+        print(f"   Meal type: {recipe.meal_type}")
     if recipe.prep_time_minutes:
         print(f"   Prep time: {recipe.prep_time_minutes} min")
 
@@ -35,13 +35,24 @@ def print_recipe(recipe) -> None:
     print(f"   Fat:       {n.fat_g}g")
     if n.fiber_g is not None:
         print(f"   Fiber:     {n.fiber_g}g")
+    if n.sodium_mg is not None:
+        print(f"   Sodium:    {n.sodium_mg}mg")
 
 
 if __name__ == "__main__":
-    print("🍽️  Starting Personalized Nutrition Chef...\n")
+    print("🍽️  Starting Personalized Nutrition Chef (Phase 2)...\n")
 
-    raw = graph.invoke(NutritionState())
+    raw   = graph.invoke(NutritionState())
     state = NutritionState(**raw)
+
+    # ── Age Profile ───────────────────────────────────────────────────────────
+    if state.age_profile:
+        print("\n" + "="*60)
+        print("AGE PROFILE")
+        print("="*60)
+        ap = state.age_profile
+        print(f"Group: {ap.age_group}")
+        print(f"Notes: {ap.notes}")
 
     # ── Final Recipe ──────────────────────────────────────────────────────────
     print("\n" + "="*60)
@@ -49,11 +60,11 @@ if __name__ == "__main__":
     print("="*60)
     print_recipe(state.final_recipe)
 
-    # ── Validation summary ────────────────────────────────────────────────────
+    # ── Validation ────────────────────────────────────────────────────────────
     print("\n" + "="*60)
     print("NUTRITION VALIDATION")
     print("="*60)
-    if state.validation_result:
+    if state.validation_notes:
         print(state.validation_notes)
 
     # ── Substitutions ─────────────────────────────────────────────────────────
@@ -75,5 +86,22 @@ if __name__ == "__main__":
     print("\n" + "="*60)
     print("YOUR FEEDBACK")
     print("="*60)
-    print(f"Rating: {'⭐' * (state.feedback_rating or 0)}")
+    print(f"Rating:  {'⭐' * (state.feedback_rating or 0)}")
     print(f"Comment: {state.feedback_comment or 'None'}")
+
+    # ── Learned Preferences ───────────────────────────────────────────────────
+    if state.learned_preferences:
+        print("\n" + "="*60)
+        print("LEARNED PREFERENCES (saved for next session)")
+        print("="*60)
+        lp = state.learned_preferences
+        if lp.liked_ingredients:
+            print(f"  ✅ Likes:    {', '.join(lp.liked_ingredients)}")
+        if lp.disliked_ingredients:
+            print(f"  ❌ Dislikes: {', '.join(lp.disliked_ingredients)}")
+        if lp.goal_refinement:
+            print(f"  🎯 Goal update: {lp.goal_refinement}")
+        if lp.session_insights:
+            print("  💡 Insights:")
+            for note in lp.session_insights:
+                print(f"     - {note}")
