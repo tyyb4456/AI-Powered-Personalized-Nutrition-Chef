@@ -1,27 +1,28 @@
 """
 schemas/nutrition_schemas.py
 
-Structured Pydantic models for all LLM outputs.
-Phase 2 additions:
-- MedicalCondition model
-- AgeProfile with dietary flags
-- LearnedPreferences for cross-session memory
-- RecipeContext for RAG-style injection
-- Extended NutritionFacts with micronutrients
+All Pydantic models for the Nutrition AI system.
+
+Phase 1: Core recipe + validation models
+Phase 2: MedicalCondition, AgeProfile, LearnedPreferences, RecipeContext
+Phase 3: MealPlan, WeeklyNutrition, GroceryList, MealPrepSchedule,
+         ProgressLog, FoodImageAnalysis
 """
 
+from __future__ import annotations
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Literal
+from datetime import date
 
 
-# ─────────────────────────────────────────────
-# 1. Macro Split
-# ─────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# PHASE 1 — Core Models
+# ═══════════════════════════════════════════════════════════════
 
 class MacroSplit(BaseModel):
-    protein: int = Field(..., ge=0, le=100, description="Protein percentage of total calories")
-    carbs: int   = Field(..., ge=0, le=100, description="Carbohydrate percentage of total calories")
-    fat: int     = Field(..., ge=0, le=100, description="Fat percentage of total calories")
+    protein: int = Field(..., ge=0, le=100)
+    carbs:   int = Field(..., ge=0, le=100)
+    fat:     int = Field(..., ge=0, le=100)
 
     @field_validator("fat")
     @classmethod
@@ -37,172 +38,264 @@ class MacroSplit(BaseModel):
         return fat
 
 
-# ─────────────────────────────────────────────
-# 2. Nutrition Facts (extended with micronutrients)
-# ─────────────────────────────────────────────
-
 class NutritionFacts(BaseModel):
-    calories:    int   = Field(..., ge=0,  description="Total calories in kcal")
-    protein_g:   float = Field(..., ge=0,  description="Protein in grams")
-    carbs_g:     float = Field(..., ge=0,  description="Carbohydrates in grams")
-    fat_g:       float = Field(..., ge=0,  description="Fat in grams")
-    fiber_g:     Optional[float] = Field(default=None, ge=0, description="Dietary fiber in grams")
-    sodium_mg:   Optional[float] = Field(default=None, ge=0, description="Sodium in milligrams")
-    calcium_mg:  Optional[float] = Field(default=None, ge=0, description="Calcium in milligrams")
-    iron_mg:     Optional[float] = Field(default=None, ge=0, description="Iron in milligrams")
-    sugar_g:     Optional[float] = Field(default=None, ge=0, description="Sugar in grams")
+    calories:   int            = Field(..., ge=0)
+    protein_g:  float          = Field(..., ge=0)
+    carbs_g:    float          = Field(..., ge=0)
+    fat_g:      float          = Field(..., ge=0)
+    fiber_g:    Optional[float] = Field(default=None, ge=0)
+    sodium_mg:  Optional[float] = Field(default=None, ge=0)
+    calcium_mg: Optional[float] = Field(default=None, ge=0)
+    iron_mg:    Optional[float] = Field(default=None, ge=0)
+    sugar_g:    Optional[float] = Field(default=None, ge=0)
 
     @field_validator("calories")
     @classmethod
     def calories_must_be_realistic(cls, v: int) -> int:
         if v < 50:
-            raise ValueError(f"Calories too low to be a real meal: {v} kcal")
+            raise ValueError(f"Calories too low: {v} kcal")
         if v > 5000:
-            raise ValueError(f"Calories suspiciously high for a single meal: {v} kcal")
+            raise ValueError(f"Calories too high: {v} kcal")
         return v
 
 
-# ─────────────────────────────────────────────
-# 3. Single Ingredient
-# ─────────────────────────────────────────────
-
 class Ingredient(BaseModel):
-    name:     str = Field(..., description="Ingredient name, e.g. 'chicken breast'")
-    quantity: str = Field(..., description="Amount with unit, e.g. '200g' or '1 cup'")
+    name:     str = Field(..., description="Ingredient name")
+    quantity: str = Field(..., description="Amount with unit e.g. '200g'")
 
-
-# ─────────────────────────────────────────────
-# 4. Full Recipe Output
-# ─────────────────────────────────────────────
 
 class RecipeOutput(BaseModel):
-    dish_name:         str             = Field(..., description="Creative but relevant dish name")
-    ingredients:       list[Ingredient] = Field(..., description="Full ingredient list with quantities")
-    steps:             list[str]       = Field(..., description="Numbered preparation steps")
-    nutrition:         NutritionFacts  = Field(..., description="Nutritional breakdown of the complete dish")
-    cuisine:           Optional[str]   = Field(default=None, description="Cuisine type")
-    prep_time_minutes: Optional[int]   = Field(default=None, ge=1, description="Estimated prep time")
-    meal_type:         Optional[str]   = Field(default=None, description="breakfast / lunch / dinner / snack")
+    dish_name:         str              = Field(...)
+    ingredients:       list[Ingredient] = Field(...)
+    steps:             list[str]        = Field(...)
+    nutrition:         NutritionFacts   = Field(...)
+    cuisine:           Optional[str]    = None
+    prep_time_minutes: Optional[int]    = Field(default=None, ge=1)
+    meal_type:         Optional[str]    = Field(
+        default=None,
+        description="breakfast / lunch / dinner / snack"
+    )
 
     def ingredients_as_strings(self) -> list[str]:
         return [f"{ing.quantity} {ing.name}" for ing in self.ingredients]
 
 
-# ─────────────────────────────────────────────
-# 5. Substitution Output
-# ─────────────────────────────────────────────
-
 class SubstitutionItem(BaseModel):
-    original_ingredient:   str = Field(..., description="The ingredient that was replaced")
-    substitute_ingredient: str = Field(..., description="The safe replacement ingredient")
-    reason:                str = Field(..., description="Why this substitution was made")
+    original_ingredient:   str = Field(...)
+    substitute_ingredient: str = Field(...)
+    reason:                str = Field(...)
 
 
 class SubstitutionOutput(BaseModel):
-    substitutions_made: bool                   = Field(..., description="True if any substitutions were needed")
-    substitutions:      list[SubstitutionItem]  = Field(default_factory=list)
-    revised_recipe:     Optional[RecipeOutput]  = Field(
-        default=None,
-        description="Full revised recipe. Required if substitutions_made is True."
-    )
+    substitutions_made: bool                  = Field(...)
+    substitutions:      list[SubstitutionItem] = Field(default_factory=list)
+    revised_recipe:     Optional[RecipeOutput] = None
 
-
-# ─────────────────────────────────────────────
-# 6. Macro Adjustment Output
-# ─────────────────────────────────────────────
 
 class MacroAdjustmentOutput(BaseModel):
-    adjusted_recipe:  RecipeOutput = Field(..., description="Revised recipe with adjusted macros")
-    adjustment_notes: str          = Field(..., description="Explanation of what was changed and why")
+    adjusted_recipe:  RecipeOutput = Field(...)
+    adjustment_notes: str          = Field(...)
 
-
-# ─────────────────────────────────────────────
-# 7. Validation Result
-# ─────────────────────────────────────────────
 
 class ValidationResult(BaseModel):
-    passed:           bool  = Field(..., description="True if recipe meets all nutrition targets")
-    calorie_check:    bool  = Field(..., description="Calories within ±10% of target")
-    protein_check:    bool  = Field(..., description="Protein ratio within ±5% of target")
-    carbs_check:      bool  = Field(..., description="Carbs ratio within ±5% of target")
-    fat_check:        bool  = Field(..., description="Fat ratio within ±5% of target")
-    fiber_check:      bool  = Field(default=True, description="Fiber meets minimum if specified")
-    allergen_check:   bool  = Field(default=True, description="No allergens detected in final recipe")
-    notes:            str   = Field(..., description="Human-readable summary of validation result")
-    calorie_diff_pct: float = Field(..., description="% difference from calorie target")
+    passed:           bool  = Field(...)
+    calorie_check:    bool  = Field(...)
+    protein_check:    bool  = Field(...)
+    carbs_check:      bool  = Field(...)
+    fat_check:        bool  = Field(...)
+    fiber_check:      bool  = Field(default=True)
+    allergen_check:   bool  = Field(default=True)
+    notes:            str   = Field(...)
+    calorie_diff_pct: float = Field(...)
 
 
-# ─────────────────────────────────────────────
-# 8. [NEW] Medical Condition
-# ─────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# PHASE 2 — Intelligence Models
+# ═══════════════════════════════════════════════════════════════
 
 MedicalConditionType = Literal[
-    "diabetes",
-    "hypertension",
-    "celiac",
-    "lactose_intolerance",
-    "kidney_disease",
-    "heart_disease",
-    "ibs",
-    "anemia",
-    "osteoporosis",
-    "none",
+    "diabetes", "hypertension", "celiac", "lactose_intolerance",
+    "kidney_disease", "heart_disease", "ibs", "anemia", "osteoporosis", "none",
 ]
 
+
 class MedicalCondition(BaseModel):
-    condition: MedicalConditionType = Field(..., description="Type of medical condition")
-    notes:     Optional[str]        = Field(default=None, description="Any extra detail from user")
+    condition: MedicalConditionType = Field(...)
+    notes:     Optional[str]        = None
 
-
-# ─────────────────────────────────────────────
-# 9. [NEW] Age-Specific Dietary Profile
-# ─────────────────────────────────────────────
 
 class AgeProfile(BaseModel):
-    """
-    Flags derived from age that influence recipe generation and validation.
-    Computed once in health_agent and stored in state.
-    """
-    age_group:            str   = Field(..., description="teen / young_adult / adult / senior")
-    higher_protein_need:  bool  = Field(default=False, description="True for seniors (muscle preservation)")
-    lower_sodium_need:    bool  = Field(default=False, description="True for seniors / hypertension")
-    higher_calcium_need:  bool  = Field(default=False, description="True for teens and seniors (bone health)")
-    higher_iron_need:     bool  = Field(default=False, description="True for teens")
-    lower_calorie_adjust: bool  = Field(default=False, description="True for seniors (lower TDEE)")
-    notes:                str   = Field(default="", description="Human-readable summary of age flags")
+    age_group:            str  = Field(...)
+    higher_protein_need:  bool = False
+    lower_sodium_need:    bool = False
+    higher_calcium_need:  bool = False
+    higher_iron_need:     bool = False
+    lower_calorie_adjust: bool = False
+    notes:                str  = ""
 
-
-# ─────────────────────────────────────────────
-# 10. [NEW] Learned Preferences (cross-session memory)
-# ─────────────────────────────────────────────
 
 class LearnedPreferences(BaseModel):
-    """
-    Structured preferences the learning loop extracts from feedback.
-    Stored per user and injected into future recipe prompts.
-    """
-    liked_ingredients:    list[str] = Field(default_factory=list)
-    disliked_ingredients: list[str] = Field(default_factory=list)
-    preferred_textures:   list[str] = Field(default_factory=list)   # e.g. "crispy", "soft"
-    preferred_cuisines:   list[str] = Field(default_factory=list)
-    avoided_cuisines:     list[str] = Field(default_factory=list)
-    spice_preference:     Optional[str] = Field(default=None)       # low / medium / high
-    goal_refinement:      Optional[str] = Field(default=None)       # updated goal interpretation
-    session_insights:     list[str] = Field(default_factory=list)   # free-text notes from LLM
+    liked_ingredients:    list[str]    = Field(default_factory=list)
+    disliked_ingredients: list[str]    = Field(default_factory=list)
+    preferred_textures:   list[str]    = Field(default_factory=list)
+    preferred_cuisines:   list[str]    = Field(default_factory=list)
+    avoided_cuisines:     list[str]    = Field(default_factory=list)
+    spice_preference:     Optional[str] = None
+    goal_refinement:      Optional[str] = None
+    session_insights:     list[str]    = Field(default_factory=list)
 
-
-# ─────────────────────────────────────────────
-# 11. [NEW] Recipe Context (RAG-style few-shot examples)
-# ─────────────────────────────────────────────
 
 class RecipeContext(BaseModel):
-    """
-    A lightweight recipe example injected into the recipe prompt
-    to ground the LLM in realistic, cuisine-appropriate dishes.
-    """
-    dish_name:    str       = Field(..., description="Example dish name")
-    cuisine:      str       = Field(..., description="Cuisine type")
-    goal_fit:     str       = Field(..., description="Which goal this suits: muscle_gain / fat_loss / maintenance")
-    key_proteins: list[str] = Field(..., description="Main protein sources in this dish")
-    approx_calories: int    = Field(..., description="Approximate calories")
-    notes:        str       = Field(default="", description="Why this is a good example")
+    dish_name:       str       = Field(...)
+    cuisine:         str       = Field(...)
+    goal_fit:        str       = Field(...)
+    key_proteins:    list[str] = Field(...)
+    approx_calories: int       = Field(...)
+    notes:           str       = ""
+
+
+# ═══════════════════════════════════════════════════════════════
+# PHASE 3 — New Agent Models
+# ═══════════════════════════════════════════════════════════════
+
+# ── 3.1 Meal Plan ─────────────────────────────────────────────
+
+MealSlotType = Literal["breakfast", "lunch", "dinner", "snack"]
+DayOfWeek    = Literal["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+
+class MealSlot(BaseModel):
+    """A single meal within a day."""
+    slot:             MealSlotType    = Field(...)
+    recipe:           RecipeOutput    = Field(...)
+    target_calories:  int             = Field(..., ge=0)
+
+
+class DayPlan(BaseModel):
+    """All meals for one day of the week."""
+    day:        DayOfWeek       = Field(...)
+    meals:      list[MealSlot]  = Field(...)
+    total_calories:  int        = Field(..., ge=0)
+    total_protein_g: float      = Field(..., ge=0)
+    total_carbs_g:   float      = Field(..., ge=0)
+    total_fat_g:     float      = Field(..., ge=0)
+    total_fiber_g:   float      = Field(default=0.0, ge=0)
+
+
+class WeeklyNutritionSummary(BaseModel):
+    """Aggregated nutrition across all 7 days."""
+    avg_daily_calories:  float = Field(...)
+    avg_daily_protein_g: float = Field(...)
+    avg_daily_carbs_g:   float = Field(...)
+    avg_daily_fat_g:     float = Field(...)
+    avg_daily_fiber_g:   float = Field(default=0.0)
+    total_weekly_calories: int = Field(...)
+    calorie_target_hit_days: int = Field(..., description="Days within ±10% of target")
+    notes:               str  = Field(default="")
+
+
+class MealPlan(BaseModel):
+    """Full 7-day meal plan."""
+    days:              list[DayPlan]            = Field(...)
+    weekly_summary:    WeeklyNutritionSummary   = Field(...)
+    plan_generated_at: Optional[str]            = None   # ISO timestamp
+
+
+# ── 3.2 Grocery List ──────────────────────────────────────────
+
+class GroceryItem(BaseModel):
+    name:              str            = Field(...)
+    total_quantity:    str            = Field(..., description="Consolidated quantity e.g. '1.4kg'")
+    category:          str            = Field(..., description="produce / protein / dairy / pantry / spices / frozen")
+    estimated_cost_pkr: Optional[float] = Field(default=None, ge=0)
+    bulk_buy_tip:      Optional[str]  = None
+
+
+class GroceryList(BaseModel):
+    items:             list[GroceryItem] = Field(...)
+    total_items:       int               = Field(...)
+    estimated_total_cost_pkr: Optional[float] = None
+    bulk_buy_savings:  Optional[str]     = None
+    shopping_notes:    Optional[str]     = None
+
+    def by_category(self) -> dict[str, list[GroceryItem]]:
+        """Group items by category for display."""
+        result: dict[str, list[GroceryItem]] = {}
+        for item in self.items:
+            result.setdefault(item.category, []).append(item)
+        return result
+
+
+# ── 3.3 Meal Prep Schedule ────────────────────────────────────
+
+class PrepTask(BaseModel):
+    """A single batch-cooking task."""
+    task:              str           = Field(..., description="e.g. 'Cook 2kg brown rice'")
+    prep_day:          str           = Field(..., description="e.g. 'Sunday' or 'Wednesday'")
+    duration_minutes:  int           = Field(..., ge=1)
+    covers_meals:      list[str]     = Field(..., description="Dish names this prep covers")
+    storage_instruction: str         = Field(..., description="e.g. 'Refrigerate in airtight container, use within 4 days'")
+    reheating_tip:     Optional[str] = None
+
+
+class MealPrepSchedule(BaseModel):
+    tasks:               list[PrepTask] = Field(...)
+    total_prep_time_min: int            = Field(..., ge=0)
+    prep_days:           list[str]      = Field(..., description="Which days require prep")
+    efficiency_notes:    str            = Field(default="")
+
+
+# ── 3.4 Progress Tracking ─────────────────────────────────────
+
+class MealLogEntry(BaseModel):
+    """One logged meal (consumed vs planned)."""
+    log_date:        str            = Field(..., description="ISO date e.g. '2025-03-01'")
+    meal_slot:       MealSlotType   = Field(...)
+    dish_name:       str            = Field(...)
+    planned:         bool           = Field(..., description="Was this a planned meal?")
+    calories:        int            = Field(..., ge=0)
+    protein_g:       float          = Field(..., ge=0)
+    carbs_g:         float          = Field(..., ge=0)
+    fat_g:           float          = Field(..., ge=0)
+    source:          str            = Field(default="manual", description="manual / image / plan")
+
+
+class DailyAdherence(BaseModel):
+    """Adherence summary for one day."""
+    log_date:          str   = Field(...)
+    planned_calories:  int   = Field(...)
+    actual_calories:   int   = Field(...)
+    adherence_pct:     float = Field(...)
+    meals_logged:      int   = Field(...)
+    meals_skipped:     int   = Field(...)
+
+
+class WeeklyProgressReport(BaseModel):
+    """LLM-generated progress analysis."""
+    week_start:          str        = Field(...)
+    week_end:            str        = Field(...)
+    avg_adherence_pct:   float      = Field(...)
+    best_day:            str        = Field(...)
+    worst_day:           str        = Field(...)
+    patterns_identified: list[str]  = Field(default_factory=list)
+    recommendations:     list[str]  = Field(default_factory=list)
+    goal_progress:       str        = Field(...)
+    motivational_note:   str        = Field(default="")
+
+
+# ── 3.5 Food Image Analysis ───────────────────────────────────
+
+class IdentifiedFoodItem(BaseModel):
+    """One food item detected in the image."""
+    name:            str            = Field(...)
+    estimated_amount: str           = Field(..., description="e.g. '1 cup' or '150g'")
+    confidence:      str            = Field(..., description="high / medium / low")
+
+
+class FoodImageAnalysis(BaseModel):
+    """Full result from the vision LLM."""
+    identified_items:   list[IdentifiedFoodItem] = Field(...)
+    estimated_nutrition: NutritionFacts           = Field(...)
+    meal_type_guess:    Optional[MealSlotType]    = None
+    analysis_notes:     str                       = Field(default="")
+    confidence_overall: str                       = Field(..., description="high / medium / low")

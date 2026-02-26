@@ -1,5 +1,5 @@
 """
-graph_builder.py — Phase 2 (graph structure unchanged)
+graph_builder.py — single-meal pipeline (Phase 1 + 2, unchanged)
 """
 
 from langgraph.graph import StateGraph, END
