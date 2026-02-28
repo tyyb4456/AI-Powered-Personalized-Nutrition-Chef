@@ -7,3 +7,27 @@ python-dotenv
 langsmith
 pytest
 pytest-asyncio
+
+
+# ── LLM Provider ──────────────────────────────────────────────────────────────
+langchain-google-genai           # gemini-2.5-flash
+
+# ── Phase 4: PostgreSQL ───────────────────────────────────────────────────────
+sqlalchemy>=2.0
+alembic                          # database migrations
+psycopg2-binary                  # PostgreSQL driver (use psycopg2 in production)
+
+# ── Phase 4: Redis ────────────────────────────────────────────────────────────
+redis>=5.0                       # session cache, recipe cache, rate limiting
+
+# ── Phase 4: ChromaDB ─────────────────────────────────────────────────────────
+chromadb                         # local vector store for RAG
+# sentence-transformers          # auto-installed by chromadb for embeddings
+
+# ── Phase 3: Image recognition ────────────────────────────────────────────────
+google-generativeai              # Gemini vision for food image analysis
+
+# ── Dev / Testing ─────────────────────────────────────────────────────────────
+pytest
+pytest-asyncio
+langsmith                        # LangGraph tracing (optional)

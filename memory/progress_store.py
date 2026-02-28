@@ -1,66 +1,84 @@
 """
-memory/progress_store.py
+memory/progress_store.py — Phase 4
 
-File-based persistence for meal logs and adherence data.
-Phase 4 will replace this with PostgreSQL.
+Replaces JSON file storage with PostgreSQL via ProgressRepository.
 
-Storage structure (data/progress/{user_id}.json):
-{
-  "logs": [ MealLogEntry.dict(), ... ],
-  "learned_preferences": LearnedPreferences.dict()
-}
-
-All public functions work with Pydantic models — callers never
-touch raw JSON directly.
+Public API is identical to Phase 3 so agents don't need to change.
+Falls back to the old JSON file if DB is unavailable (graceful degradation).
 """
 
 from __future__ import annotations
 
 import json
-import os
-from datetime import date, datetime, timedelta
+import logging
+from datetime import date, timedelta
 from pathlib import Path
+from typing import Optional
 
-from schemas.nutrition_schemas import (
-    MealLogEntry,
-    DailyAdherence,
-    LearnedPreferences,
-)
+from schemas.nutrition_schemas import MealLogEntry, DailyAdherence, LearnedPreferences
 
+logger = logging.getLogger(__name__)
+
+# ── JSON fallback path (Phase 3 behaviour) ────────────────────────────────────
 DATA_DIR = Path("data/progress")
 
 
-def _user_file(user_id: str) -> Path:
+def _json_file(user_id: str) -> Path:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     return DATA_DIR / f"{user_id}.json"
 
 
-def _load_raw(user_id: str) -> dict:
-    f = _user_file(user_id)
+def _load_json(user_id: str) -> dict:
+    f = _json_file(user_id)
     if not f.exists():
         return {"logs": [], "learned_preferences": None}
     with open(f) as fh:
         return json.load(fh)
 
 
-def _save_raw(user_id: str, data: dict) -> None:
-    with open(_user_file(user_id), "w") as fh:
+def _save_json(user_id: str, data: dict) -> None:
+    with open(_json_file(user_id), "w") as fh:
         json.dump(data, fh, indent=2, default=str)
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def log_meal(user_id: str, entry: MealLogEntry) -> None:
-    """Append one meal log entry for the user."""
-    data = _load_raw(user_id)
+def log_meal(user_id: str, entry: MealLogEntry, recipe_id: Optional[str] = None) -> None:
+    """
+    Log a consumed meal.
+    Writes to PostgreSQL first; falls back to JSON if DB unavailable.
+    """
+    try:
+        from db.database import get_db
+        from db.repositories import ProgressRepository
+        with get_db() as db:
+            repo = ProgressRepository(db)
+            repo.log_meal(user_id, entry, recipe_id=recipe_id)
+        logger.info("Meal logged to DB: %s (%d kcal)", entry.dish_name, entry.calories)
+        print(f"   📝 Logged to DB: {entry.dish_name} ({entry.calories} kcal) on {entry.log_date}")
+        return
+    except Exception as e:
+        logger.warning("DB log_meal failed (%s) — falling back to JSON.", e)
+
+    # ── JSON fallback ─────────────────────────────────────────────────────────
+    data = _load_json(user_id)
     data["logs"].append(entry.model_dump())
-    _save_raw(user_id, data)
-    print(f"   📝 Logged: {entry.dish_name} ({entry.calories} kcal) on {entry.log_date}")
+    _save_json(user_id, data)
+    print(f"   📝 Logged to file: {entry.dish_name} ({entry.calories} kcal) on {entry.log_date}")
 
 
 def get_logs(user_id: str, days: int = 7) -> list[MealLogEntry]:
-    """Return logs from the last N days."""
-    data  = _load_raw(user_id)
+    """Return meal logs for the last N days from PostgreSQL or JSON fallback."""
+    try:
+        from db.database import get_db
+        from db.repositories import ProgressRepository
+        with get_db() as db:
+            return ProgressRepository(db).get_logs(user_id, days)
+    except Exception as e:
+        logger.warning("DB get_logs failed (%s) — falling back to JSON.", e)
+
+    # ── JSON fallback ─────────────────────────────────────────────────────────
+    data   = _load_json(user_id)
     cutoff = (date.today() - timedelta(days=days)).isoformat()
     return [
         MealLogEntry(**e)
@@ -74,41 +92,78 @@ def get_daily_adherence(
     planned_calories_per_day: int,
     days: int = 7,
 ) -> list[DailyAdherence]:
-    """
-    Compute per-day adherence for the last N days.
-    planned_calories_per_day comes from state.calorie_target.
-    """
-    logs    = get_logs(user_id, days=days)
+    """Compute per-day adherence. Uses PostgreSQL or JSON fallback."""
+    try:
+        from db.database import get_db
+        from db.repositories import ProgressRepository
+        with get_db() as db:
+            return ProgressRepository(db).get_daily_adherence(
+                user_id, planned_calories_per_day, days
+            )
+    except Exception as e:
+        logger.warning("DB get_daily_adherence failed (%s) — computing from JSON.", e)
+
+    # ── JSON fallback: compute from raw logs ──────────────────────────────────
+    from schemas.nutrition_schemas import DailyAdherence as DA
+    logs    = get_logs(user_id, days)
     by_day: dict[str, list[MealLogEntry]] = {}
     for entry in logs:
         by_day.setdefault(entry.log_date, []).append(entry)
 
     result = []
     for log_date, day_logs in sorted(by_day.items()):
-        actual_cal = sum(e.calories for e in day_logs)
-        adherence  = (actual_cal / planned_calories_per_day * 100) if planned_calories_per_day else 0
-        result.append(DailyAdherence(
+        actual = sum(e.calories for e in day_logs)
+        pct    = (actual / planned_calories_per_day * 100) if planned_calories_per_day else 0
+        result.append(DA(
             log_date=log_date,
             planned_calories=planned_calories_per_day,
-            actual_calories=actual_cal,
-            adherence_pct=round(adherence, 1),
+            actual_calories=actual,
+            adherence_pct=round(pct, 1),
             meals_logged=len(day_logs),
-            meals_skipped=max(0, 3 - len(day_logs)),   # assumes 3 meals/day
+            meals_skipped=max(0, 3 - len(day_logs)),
         ))
     return result
 
 
 def save_learned_preferences(user_id: str, prefs: LearnedPreferences) -> None:
-    data = _load_raw(user_id)
-    data["learned_preferences"] = prefs.model_dump()
-    _save_raw(user_id, data)
+    """Persist LearnedPreferences to PostgreSQL and ChromaDB."""
+    try:
+        from db.database import get_db
+        from db.repositories import LearnedPreferencesRepository
+        with get_db() as db:
+            LearnedPreferencesRepository(db).save(user_id, prefs)
+        logger.info("Learned preferences saved to DB for user %s", user_id)
+    except Exception as e:
+        logger.warning("DB save_learned_preferences failed (%s) — saving to JSON.", e)
+        data = _load_json(user_id)
+        data["learned_preferences"] = prefs.model_dump()
+        _save_json(user_id, data)
+
+    # ── Also update ChromaDB preference embedding ─────────────────────────────
+    try:
+        from vector_store.chroma_store import chroma_store
+        pref_text = (
+            f"Likes: {', '.join(prefs.liked_ingredients)}. "
+            f"Dislikes: {', '.join(prefs.disliked_ingredients)}. "
+            f"Cuisines: {', '.join(prefs.preferred_cuisines)}. "
+            f"Spice: {prefs.spice_preference or 'medium'}. "
+            f"Goal: {prefs.goal_refinement or 'general fitness'}."
+        )
+        chroma_store.upsert_user_preferences(user_id, pref_text)
+    except Exception as e:
+        logger.warning("ChromaDB preference upsert failed: %s", e)
 
 
 def load_learned_preferences(user_id: str) -> Optional[LearnedPreferences]:
-    data = _load_raw(user_id)
+    """Load LearnedPreferences from PostgreSQL or JSON fallback."""
+    try:
+        from db.database import get_db
+        from db.repositories import LearnedPreferencesRepository
+        with get_db() as db:
+            return LearnedPreferencesRepository(db).load(user_id)
+    except Exception as e:
+        logger.warning("DB load_learned_preferences failed (%s) — loading from JSON.", e)
+
+    data = _load_json(user_id)
     raw  = data.get("learned_preferences")
     return LearnedPreferences(**raw) if raw else None
-
-
-# Fix missing Optional import
-from typing import Optional

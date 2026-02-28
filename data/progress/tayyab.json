@@ -1,0 +1,25 @@
+{
+  "logs": [
+    {
+      "log_date": "2026-02-26",
+      "meal_slot": "dinner",
+      "dish_name": "Mixed wild mushrooms, Microgreens, White culinary foam/puree",
+      "planned": false,
+      "calories": 149,
+      "protein_g": 8.7,
+      "carbs_g": 15.4,
+      "fat_g": 8.7,
+      "source": "image"
+    }
+  ],
+  "learned_preferences": {
+    "liked_ingredients": [],
+    "disliked_ingredients": [],
+    "preferred_textures": [],
+    "preferred_cuisines": [],
+    "avoided_cuisines": [],
+    "spice_preference": null,
+    "goal_refinement": null,
+    "session_insights": []
+  }
+}
