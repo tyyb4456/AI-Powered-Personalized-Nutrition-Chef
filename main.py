@@ -64,13 +64,11 @@ def startup() -> None:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Display helpers
+# Display helpers (unchanged from Phase 3)
 # ═══════════════════════════════════════════════════════════════
 
 def print_recipe(recipe) -> None:
-    if not recipe:
-        print("No recipe available.")
-        return
+    if not recipe: print("No recipe available."); return
     print(f"\n🍽️  {recipe.dish_name}")
     if recipe.cuisine:           print(f"   Cuisine:   {recipe.cuisine}")
     if recipe.meal_type:         print(f"   Meal type: {recipe.meal_type}")
@@ -89,14 +87,12 @@ def print_recipe(recipe) -> None:
 
 
 def print_meal_plan(meal_plan) -> None:
-    if not meal_plan:
-        return
+    if not meal_plan: return
     print("\n📅 7-DAY MEAL PLAN")
     print("=" * 70)
     for day in meal_plan.days:
         print(f"\n{'─'*70}")
-        print(f"  {day.day.upper()}  —  {day.total_calories} kcal | "
-              f"P:{day.total_protein_g:.0f}g C:{day.total_carbs_g:.0f}g F:{day.total_fat_g:.0f}g")
+        print(f"  {day.day.upper()}  —  {day.total_calories} kcal | P:{day.total_protein_g:.0f}g C:{day.total_carbs_g:.0f}g F:{day.total_fat_g:.0f}g")
         for slot in day.meals:
             print(f"  [{slot.slot:10}] {slot.recipe.dish_name:40} {slot.recipe.nutrition.calories:>4} kcal")
     s = meal_plan.weekly_summary
@@ -105,8 +101,7 @@ def print_meal_plan(meal_plan) -> None:
 
 
 def print_grocery_list(grocery) -> None:
-    if not grocery:
-        return
+    if not grocery: return
     print("\n🛒 GROCERY LIST")
     print("=" * 60)
     for category, items in sorted(grocery.by_category().items()):
@@ -114,42 +109,34 @@ def print_grocery_list(grocery) -> None:
         for item in items:
             cost = f"  ~PKR {item.estimated_cost_pkr:.0f}" if item.estimated_cost_pkr else ""
             print(f"    • {item.total_quantity:15} {item.name}{cost}")
-            if item.bulk_buy_tip:
-                print(f"      💡 {item.bulk_buy_tip}")
+            if item.bulk_buy_tip: print(f"      💡 {item.bulk_buy_tip}")
     if grocery.estimated_total_cost_pkr:
         print(f"\n  💰 Estimated total: PKR {grocery.estimated_total_cost_pkr:,.0f}")
 
 
 def print_prep_schedule(schedule) -> None:
-    if not schedule:
-        return
+    if not schedule: return
     print("\n🥘 MEAL PREP SCHEDULE")
     print("=" * 60)
     print(f"   Total: {schedule.total_prep_time_min} min | Days: {schedule.prep_days}")
     for task in schedule.tasks:
         print(f"\n  [{task.prep_day}] {task.task} ({task.duration_minutes} min)")
         print(f"         📦 {task.storage_instruction}")
-        if task.reheating_tip:
-            print(f"         🔥 {task.reheating_tip}")
+        if task.reheating_tip: print(f"         🔥 {task.reheating_tip}")
         print(f"         Covers: {', '.join(task.covers_meals)}")
 
 
 def print_progress_report(report) -> None:
-    if not report:
-        return
+    if not report: return
     print("\n📈 WEEKLY PROGRESS REPORT")
     print("=" * 60)
     print(f"   {report.week_start} → {report.week_end}")
-    print(f"   Avg adherence: {report.avg_adherence_pct:.1f}% | "
-          f"Best: {report.best_day} | Worst: {report.worst_day}")
+    print(f"   Avg adherence: {report.avg_adherence_pct:.1f}% | Best: {report.best_day} | Worst: {report.worst_day}")
     print(f"\n   {report.goal_progress}")
-    for p in report.patterns_identified:
-        print(f"   • {p}")
+    for p in report.patterns_identified: print(f"   • {p}")
     print("\n   Recommendations:")
-    for r in report.recommendations:
-        print(f"   • {r}")
-    if report.motivational_note:
-        print(f"\n   ✨ {report.motivational_note}")
+    for r in report.recommendations:     print(f"   • {r}")
+    if report.motivational_note:         print(f"\n   ✨ {report.motivational_note}")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -168,9 +155,7 @@ def collect_profile() -> NutritionState:
             from cache.redis_client import redis_client
             cached_state = redis_client.load_session(name_guess)
             if cached_state:
-                resume = input(
-                    f"   ⚡ Active session found for '{name_guess}'. Resume? (y/n): "
-                ).strip().lower()
+                resume = input(f"   ⚡ Active session found for '{name_guess}'. Resume? (y/n): ").strip().lower()
                 if resume == "y":
                     print("   ✅ Session restored from cache.")
                     return NutritionState(**cached_state)
@@ -178,6 +163,9 @@ def collect_profile() -> NutritionState:
             pass
 
     # ── Full profile collection ───────────────────────────────────────────────
+    # We already asked for the name above — inject it into stdin isn't clean,
+    # so we rely on profile_agent_node asking again. In a real app this would
+    # be passed as a parameter. For CLI it's an acceptable two-step.
     state   = profile_agent_node(NutritionState())
     updates = health_goal_agent_node(state)
     state   = state.model_copy(update=updates)
@@ -199,49 +187,29 @@ def collect_profile() -> NutritionState:
 
 def run_single_meal() -> None:
     import uuid
-    from graph_builder import graph
-    from langgraph.types import Command
-
+    from graph_builder import invoke_for_user, resume_for_user, get_interrupt_prompt
     print("🍽️  SINGLE MEAL MODE\n")
 
-    config  = {"configurable": {"thread_id": str(uuid.uuid4())}}
-    initial = NutritionState()
+    # Fresh UUID per run so state never bleeds between sessions
+    thread_id = str(uuid.uuid4())
 
-    # ── Run graph, handling interrupts in a loop ──────────────────────────────
-    cmd = initial  # first call passes the initial state
-    raw = None
+    # ── Step 1: start the graph ───────────────────────────────────────────────
+    # invoke_for_user runs until END or until an interrupt() is hit.
+    # When feedback_agent calls interrupt(), LangGraph raises GraphInterrupt
+    # and graph.invoke() returns the CURRENT state snapshot (not the final one).
+    raw = invoke_for_user(thread_id, NutritionState())
 
+    # ── Step 2: handle interrupts (feedback_agent has two: rating + comment) ──
+    # After each interrupt, get_interrupt_prompt() tells us what the graph
+    # is waiting for, we ask the user, then resume_for_user() continues.
     while True:
-        try:
-            raw = graph.invoke(cmd, config=config)
-            break  # graph ran to END — we're done
-        except Exception as exc:
-            # LangGraph raises GraphInterrupt (subclass of Exception) when
-            # an interrupt() call is hit inside a node.
-            exc_type = type(exc).__name__
-            if "Interrupt" not in exc_type:
-                raise  # re-raise anything that isn't an interrupt
+        prompt = get_interrupt_prompt(thread_id)
+        if prompt is None:
+            break   # graph reached END — no more interrupts
+        user_answer = input(f"{prompt} ").strip()
+        raw = resume_for_user(thread_id, user_answer)
 
-            # ── Graph is paused — find the prompt and ask the user ────────────
-            g_state = graph.get_state(config)
-            prompt  = None
-            for task in (g_state.tasks or []):
-                interrupts = getattr(task, "interrupts", None)
-                if interrupts:
-                    prompt = interrupts[0].value
-                    break
-
-            if prompt is None:
-                print("⚠️ Graph interrupted but no prompt found.")
-                break
-
-            user_answer = input(f"{prompt} ").strip()
-            cmd = Command(resume=user_answer)   # next invoke resumes with this value
-
-    if raw is None:
-        print("⚠️ Graph ended without completing.")
-        return
-
+    # ── Step 3: render final output ───────────────────────────────────────────
     state = NutritionState(**raw)
 
     if state.age_profile:
@@ -251,8 +219,7 @@ def run_single_meal() -> None:
     print_recipe(state.final_recipe)
 
     print("\n" + "="*60 + "\nVALIDATION\n" + "="*60)
-    if state.validation_notes:
-        print(state.validation_notes)
+    if state.validation_notes: print(state.validation_notes)
 
     if state.substitutions_made and state.substitution_output:
         print("\n" + "="*60 + "\nSUBSTITUTIONS\n" + "="*60)
@@ -265,14 +232,11 @@ def run_single_meal() -> None:
     print(f"\nRating: {'⭐' * (state.feedback_rating or 0)}")
     if state.learned_preferences:
         lp = state.learned_preferences
-        if lp.liked_ingredients:
-            print(f"Learned likes:    {', '.join(lp.liked_ingredients)}")
-        if lp.disliked_ingredients:
-            print(f"Learned dislikes: {', '.join(lp.disliked_ingredients)}")
+        if lp.liked_ingredients:    print(f"Learned likes:    {', '.join(lp.liked_ingredients)}")
+        if lp.disliked_ingredients: print(f"Learned dislikes: {', '.join(lp.disliked_ingredients)}")
 
 
 def run_weekly_plan() -> None:
-    import uuid
     from weekly_graph_builder import weekly_graph
     print("📅  WEEKLY MEAL PLAN MODE\n")
     profile = collect_profile()
@@ -288,9 +252,8 @@ def run_weekly_plan() -> None:
         learned_preferences=profile.learned_preferences,
     )
 
-    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
-    raw    = weekly_graph.invoke(weekly_state, config=config)
-    state  = WeeklyPlanState(**raw)
+    raw   = weekly_graph.invoke(weekly_state, config={"configurable": {"thread_id": str(__import__("uuid").uuid4())}})
+    state = WeeklyPlanState(**raw)
 
     print_meal_plan(state.meal_plan)
     print_grocery_list(state.grocery_list)
@@ -336,7 +299,5 @@ if __name__ == "__main__":
     startup()
     print()
 
-    {"meal":     run_single_meal,
-     "weekly":   run_weekly_plan,
-     "image":    run_image_scan,
-     "progress": run_progress}[args.mode]()
+    {"meal": run_single_meal, "weekly": run_weekly_plan,
+     "image": run_image_scan, "progress": run_progress}[args.mode]()

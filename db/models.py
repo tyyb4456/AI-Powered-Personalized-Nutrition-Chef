@@ -189,8 +189,8 @@ class RecipeIngredient(Base):
 
     id:         Mapped[str]      = mapped_column(String(36), primary_key=True, default=_uuid)
     recipe_id:  Mapped[str]      = mapped_column(String(36), ForeignKey("recipes.id"))
-    name:       Mapped[str]      = mapped_column(String(100))
-    quantity:   Mapped[str]      = mapped_column(String(50))
+    name:       Mapped[str]      = mapped_column(Text)        # LLM names can be long: "Chicken breast, boneless, skinless"
+    quantity:   Mapped[str]      = mapped_column(Text)        # LLM quantities can be long: "800g (about 6-7 medium), finely chopped"
 
     recipe: Mapped[Recipe] = relationship("Recipe", back_populates="ingredients")
 
