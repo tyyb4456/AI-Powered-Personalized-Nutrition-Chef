@@ -17,9 +17,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from db.models import Base
-from api.app import create_app
-from api.dependencies import get_db
-from api.schemas.recipe_schemas import (
+from app import create_app
+from dependencies import get_db
+from schemas.recipe_schemas import (
     RecipeResponse, NutritionOut, ValidationOut, RecipeListResponse,
 )
 
@@ -197,7 +197,7 @@ class TestGetRecipe:
         assert r.status_code == 404
 
     def test_get_recipe_success(self, client, auth_headers):
-        from api.schemas.recipe_schemas import RecipeSummary
+        from schemas.recipe_schemas import RecipeSummary
         mock_summary = RecipeSummary(
             recipe_id="abc123",
             dish_name="Daal Mash",
@@ -228,7 +228,7 @@ class TestListRecipes:
         assert r.status_code == 401
 
     def test_list_returns_empty(self, client, auth_headers):
-        from api.schemas.recipe_schemas import RecipeListResponse
+        from schemas.recipe_schemas import RecipeListResponse
         mock_list = RecipeListResponse(recipes=[], total=0, page=1, limit=10)
 
         with patch("api.routers.recipes.list_user_recipes", return_value=mock_list):
@@ -239,7 +239,7 @@ class TestListRecipes:
         assert r.json()["recipes"] == []
 
     def test_list_pagination_params(self, client, auth_headers):
-        from api.schemas.recipe_schemas import RecipeListResponse
+        from schemas.recipe_schemas import RecipeListResponse
         mock_list = RecipeListResponse(recipes=[], total=0, page=2, limit=5)
 
         with patch("api.routers.recipes.list_user_recipes", return_value=mock_list) as mock_fn:
