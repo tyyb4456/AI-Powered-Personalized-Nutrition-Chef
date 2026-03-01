@@ -6,8 +6,7 @@ Phase 4 upgrade:
   is persisted to the database
 - Falls back to MemorySaver if PostgreSQL is unavailable (dev/offline mode)
 - thread_id = user's customer_id so each user has an isolated checkpoint history
-- interrupted sessions can be resumed:
-    graph.invoke(None, config={"configurable": {"thread_id": user_id}})
+- interrupted sessions can be resumed via resume_for_user()
 
 FIX (Phase 4 bug):
   Previously used `with PostgresSaver.from_conn_string(...) as cp:` which
@@ -17,12 +16,18 @@ FIX (Phase 4 bug):
   Solution: open a plain persistent psycopg connection (not a context manager)
   so it stays alive for the full lifetime of the process / graph object.
   A ConnectionPool is even better for concurrent use, so we prefer that.
+
+Interrupt flow (Phase 4):
+  feedback_agent uses interrupt() for human-in-the-loop feedback collection.
+  Use invoke_for_user() to start, then resume_for_user() for each interrupt prompt.
+  Use get_interrupt_prompt() to check what the graph is waiting for.
 """
 
 import logging
 import os
 
 from langgraph.graph import StateGraph, END
+from langgraph.types import Command
 from state import NutritionState
 
 from agents.profile_agent          import profile_agent_node
@@ -126,7 +131,7 @@ def _build_checkpointer():
         from langgraph.checkpoint.postgres import PostgresSaver
 
         # DO NOT use `with psycopg.connect(...)` here — that would close the
-        # connection when the block exits.  We want it to stay open.
+        # connection when the block exits. We want it to stay open.
         conn = psycopg.connect(DB_URI, autocommit=True)
         cp = PostgresSaver(conn)
         cp.setup()
@@ -144,13 +149,86 @@ def _build_checkpointer():
 graph = builder.compile(checkpointer=_build_checkpointer())
 
 
-# ── Helper: invoke with user-scoped thread ────────────────────────────────────
+# ── Helper: start graph with user-scoped thread ───────────────────────────────
 
 def invoke_for_user(user_id: str, initial_state: NutritionState | None = None) -> dict:
     """
-    Invoke the graph with a thread_id tied to the user.
-    If the user has a saved checkpoint, LangGraph resumes from the last state.
-    Pass initial_state=None to resume; pass a NutritionState to start fresh.
+    Start or resume the graph with a thread_id tied to the user.
+
+    - Pass a NutritionState to start a fresh run.
+    - Pass initial_state=None to resume from the last saved checkpoint
+      (e.g. after a crash, but NOT for interrupt resumption — use resume_for_user() for that).
+
+    Returns the graph output dict, or an interrupted GraphInterrupt if the
+    graph pauses at a feedback_agent interrupt().
     """
     config = {"configurable": {"thread_id": user_id}}
     return graph.invoke(initial_state, config=config)
+
+
+# ── Helper: resume an interrupted graph ──────────────────────────────────────
+
+def resume_for_user(user_id: str, resume_value) -> dict:
+    """
+    Resume a graph that is currently paused at an interrupt().
+
+    Call this once per interrupt prompt with the user's answer.
+    The graph will run until the next interrupt() or until it reaches END.
+
+    Args:
+        user_id:      The same user_id used in invoke_for_user().
+        resume_value: The user's answer to the current interrupt prompt
+                      (string, int, etc.).
+
+    Returns:
+        Graph output dict, or raises GraphInterrupt if another interrupt follows.
+
+    Example usage:
+        # Graph paused at "Rate the recipe (1–5):"
+        resume_for_user(user_id, "4")
+
+        # Graph paused at "Any comments or suggestions?"
+        resume_for_user(user_id, "Loved it!")
+
+        # Graph runs to END
+    """
+    config = {"configurable": {"thread_id": user_id}}
+    return graph.invoke(Command(resume=resume_value), config=config)
+
+
+# ── Helper: inspect current interrupt prompt ─────────────────────────────────
+
+def get_interrupt_prompt(user_id: str) -> str | None:
+    """
+    Check whether the graph is currently paused at an interrupt() for this user.
+
+    Returns the interrupt prompt string if the graph is waiting for input,
+    or None if the graph is not interrupted (still running or already finished).
+
+    Example usage:
+        prompt = get_interrupt_prompt(user_id)
+        if prompt:
+            user_answer = input(f"{prompt} ")
+            resume_for_user(user_id, user_answer)
+    """
+    config = {"configurable": {"thread_id": user_id}}
+    state = graph.get_state(config)
+
+    if state.tasks:
+        for task in state.tasks:
+            if hasattr(task, "interrupts") and task.interrupts:
+                return task.interrupts[0].value  # the prompt string passed to interrupt()
+
+    return None
+
+
+# ── Helper: check if graph is done ───────────────────────────────────────────
+
+def is_graph_finished(user_id: str) -> bool:
+    """
+    Returns True if the graph has reached END for this user's thread,
+    False if it is still running or paused at an interrupt.
+    """
+    config = {"configurable": {"thread_id": user_id}}
+    state = graph.get_state(config)
+    return len(state.next) == 0

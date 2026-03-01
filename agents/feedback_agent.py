@@ -4,7 +4,7 @@ agents/feedback_agent.py — Phase 4
 Phase 4 upgrade:
 - Persists feedback to user_feedback table via UserRepository
 - Links feedback to user_id + recipe_id from state
-- Still collects interactively; Phase 5 will move this to API endpoint
+- Uses LangGraph interrupt for human-in-the-loop feedback collection
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 
 from state import NutritionState
+from langgraph.types import interrupt
 
 logger = logging.getLogger(__name__)
 
@@ -19,16 +20,21 @@ logger = logging.getLogger(__name__)
 def feedback_agent_node(state: NutritionState) -> dict:
     print("\n🧪 Collecting feedback on the meal...")
 
+    # ── Collect rating via interrupt ───────────────────────────────────────────
+    rating = None
     while True:
+        raw = interrupt("Rate the recipe (1–5):")
         try:
-            rating = int(input("⭐ Rate the recipe (1–5): ").strip())
+            rating = int(str(raw).strip())
             if 1 <= rating <= 5:
                 break
-            print("   ⚠️ Please enter a number between 1 and 5.")
+            interrupt("⚠️ Please enter a number between 1 and 5. Rate the recipe (1–5):")
         except ValueError:
-            print("   ⚠️ Invalid input. Enter a number.")
+            interrupt("⚠️ Invalid input. Rate the recipe (1–5):")
 
-    comment = input("📝 Any comments or suggestions? ").strip() or None
+    # ── Collect comment via interrupt ──────────────────────────────────────────
+    comment = interrupt("📝 Any comments or suggestions? (leave blank to skip)")
+    comment = str(comment).strip() or None
 
     # ── Persist to DB ─────────────────────────────────────────────────────────
     user_id   = state.customer_id or state.name or "anonymous"
@@ -45,7 +51,7 @@ def feedback_agent_node(state: NutritionState) -> dict:
                     rating=rating,
                     comment=comment,
                 )
-            print(f"   💾 Feedback saved to DB.")
+            print("   💾 Feedback saved to DB.")
         except Exception as e:
             logger.warning("Could not save feedback to DB (%s).", e)
     else:
