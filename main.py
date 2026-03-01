@@ -200,14 +200,49 @@ def collect_profile() -> NutritionState:
 def run_single_meal() -> None:
     import uuid
     from graph_builder import graph
+    from langgraph.types import Command
+
     print("🍽️  SINGLE MEAL MODE\n")
 
-    # Any checkpointer (including MemorySaver) requires thread_id in config.
-    # Fresh UUID per run prevents stale state bleed between sessions.
     config  = {"configurable": {"thread_id": str(uuid.uuid4())}}
     initial = NutritionState()
-    raw     = graph.invoke(initial, config=config)
-    state   = NutritionState(**raw)
+
+    # ── Run graph, handling interrupts in a loop ──────────────────────────────
+    cmd = initial  # first call passes the initial state
+    raw = None
+
+    while True:
+        try:
+            raw = graph.invoke(cmd, config=config)
+            break  # graph ran to END — we're done
+        except Exception as exc:
+            # LangGraph raises GraphInterrupt (subclass of Exception) when
+            # an interrupt() call is hit inside a node.
+            exc_type = type(exc).__name__
+            if "Interrupt" not in exc_type:
+                raise  # re-raise anything that isn't an interrupt
+
+            # ── Graph is paused — find the prompt and ask the user ────────────
+            g_state = graph.get_state(config)
+            prompt  = None
+            for task in (g_state.tasks or []):
+                interrupts = getattr(task, "interrupts", None)
+                if interrupts:
+                    prompt = interrupts[0].value
+                    break
+
+            if prompt is None:
+                print("⚠️ Graph interrupted but no prompt found.")
+                break
+
+            user_answer = input(f"{prompt} ").strip()
+            cmd = Command(resume=user_answer)   # next invoke resumes with this value
+
+    if raw is None:
+        print("⚠️ Graph ended without completing.")
+        return
+
+    state = NutritionState(**raw)
 
     if state.age_profile:
         print(f"\n[Age group: {state.age_profile.age_group}]")
