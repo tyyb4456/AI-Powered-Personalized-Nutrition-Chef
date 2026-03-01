@@ -26,7 +26,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from exceptions import register_exception_handlers
-from routers import auth, users
+from routers import auth, users, recipes
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +92,7 @@ def create_app() -> FastAPI:
     # ── Routers ───────────────────────────────────────────────────────────────
     app.include_router(auth.router)
     app.include_router(users.router)
+    app.include_router(recipes.router)
 
     # ── Health check ──────────────────────────────────────────────────────────
     @app.get("/health", tags=["System"], summary="Health check")

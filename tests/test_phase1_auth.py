@@ -18,8 +18,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from db.models import Base
-from api.main import create_app
-from api.dependencies import get_db
+from app import create_app
+from dependencies import get_db
 
 
 # ── In-memory SQLite DB ───────────────────────────────────────────────────────
