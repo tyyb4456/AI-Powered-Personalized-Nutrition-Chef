@@ -1,0 +1,43 @@
+# docker-compose.prod.yml
+# Production overrides — layer on top of docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+version: "3.9"
+
+services:
+
+  api:
+    build:
+      target: runtime          # use final slim image, not dev target
+    volumes: []                # no source mount in production
+    environment:
+      ENV:       production
+      LOG_LEVEL: warning
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        gunicorn api.app:app
+          --workers ${WORKERS:-4}
+          --worker-class uvicorn.workers.UvicornWorker
+          --bind 0.0.0.0:8000
+          --timeout 300
+          --graceful-timeout 30
+          --keep-alive 5
+          --access-logfile -
+          --error-logfile -
+          --log-level ${LOG_LEVEL:-warning}
+      "
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus:   "2"
+          memory: "1G"
+
+  db:
+    restart: always
+    ports: []                  # no external DB port in production
+
+  redis:
+    restart: always
+    ports: []                  # no external Redis port in production

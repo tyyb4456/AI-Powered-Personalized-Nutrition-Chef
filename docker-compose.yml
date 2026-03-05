@@ -1,0 +1,105 @@
+version: "3.9"
+
+# ── Nutrition AI — Docker Compose ─────────────────────────────────────────────
+#
+# Development:   docker compose up
+# Production:    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# One-time DB setup:
+#   docker compose exec api alembic upgrade head
+#
+# Useful commands:
+#   docker compose logs -f api
+#   docker compose exec api python -m pytest tests/ -v
+#   docker compose exec db psql -U postgres nutrition_ai
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB:       ${POSTGRES_DB:-nutrition_ai}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI app ──────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-nutrition_ai}
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      # Auth
+      SECRET_KEY:                  ${SECRET_KEY:?SECRET_KEY must be set}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+      # LLM
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:?GOOGLE_API_KEY must be set}
+      # App
+      ENV:                    ${ENV:-development}
+      CORS_ORIGINS:           ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      RATE_LIMIT_MAX_CALLS:   ${RATE_LIMIT_MAX_CALLS:-20}
+      RATE_LIMIT_WINDOW_SEC:  ${RATE_LIMIT_WINDOW_SEC:-3600}
+      WORKERS:                ${WORKERS:-4}
+      LOG_LEVEL:              ${LOG_LEVEL:-info}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # Dev: mount source for hot reload (remove in production)
+      - .:/app
+    command: >
+      sh -c "
+        echo 'Running Alembic migrations...' &&
+        alembic upgrade head &&
+        echo 'Starting server...' &&
+        uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload
+      "
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+
+
+# ── Volumes ───────────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
