@@ -90,11 +90,13 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     # ── Routers ───────────────────────────────────────────────────────────────
-    from routers import auth, users, recipes, meal_plans
+    from routers import auth, users, recipes, meal_plans, feedback, meal_logs
     app.include_router(auth.router)
     app.include_router(users.router)
     app.include_router(recipes.router)
     app.include_router(meal_plans.router)
+    app.include_router(feedback.router)
+    app.include_router(meal_logs.router)
 
     # ── Health check ──────────────────────────────────────────────────────────
     @app.get("/health", tags=["System"], summary="Health check")
