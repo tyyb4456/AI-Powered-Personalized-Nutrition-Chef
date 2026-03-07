@@ -2,7 +2,7 @@
 
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../store/AuthContext';
-import { LogOut, Leaf, User, BookOpen, Sparkles, CalendarDays, ClipboardList } from 'lucide-react';
+import { LogOut, Leaf, User, BookOpen, Sparkles, CalendarDays, ClipboardList, Camera } from 'lucide-react';
 
 const NavLink = ({ to, icon: Icon, label }) => {
   const { pathname } = useLocation();
@@ -45,6 +45,7 @@ const Navbar = () => {
             <NavLink to="/recipes/generate" icon={Sparkles}      label="Generate"  />
             <NavLink to="/meal-plan"        icon={CalendarDays}  label="Meal Plan" />
             <NavLink to="/meal-log"         icon={ClipboardList} label="Meal Log"  />
+            <NavLink to="/food-camera"      icon={Camera}        label="Camera"    />
             <NavLink to="/profile"          icon={User}          label="Profile"   />
           </div>
         )}
