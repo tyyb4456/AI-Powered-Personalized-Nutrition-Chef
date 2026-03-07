@@ -1,12 +1,10 @@
 """
-main.py — Phase 4
+main.py — Phase 5
 
-Phase 4 additions:
-- DB tables created on startup (dev mode) / migrations checked
-- ChromaDB seeded with recipe bank on first run
-- Redis session caching integrated
-- Session resume: if user has an existing checkpoint, offers to resume
-- All 4 run modes preserved
+Phase 5 change:
+- ChromaDB replaced with LangChain RAG (FAISS) for vector search
+- startup() seeds LangChain FAISS store instead of ChromaDB
+- All other run modes unchanged
 
 Usage:
   python main.py                     → single meal
@@ -20,7 +18,7 @@ import logging
 import os
 import sys
 
-logging.basicConfig(level=logging.WARNING)   # suppress INFO noise from deps
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 from state import NutritionState, WeeklyPlanState
@@ -42,15 +40,17 @@ def startup() -> None:
     except Exception as e:
         logger.warning("DB init failed (%s). Running without persistence.", e)
 
-    # ── 2. ChromaDB — seed recipe bank if empty ───────────────────────────────
+    # ── 2. LangChain FAISS — seed recipe bank if not yet indexed ─────────────
     try:
-        from vector_store.chroma_store import chroma_store
-        if chroma_store.available:
-            count = chroma_store.seed_from_recipe_bank()
+        from vector_store.langchain_store import langchain_store
+        if langchain_store.available:
+            count = langchain_store.seed_from_recipe_bank()
             if count:
-                print(f"   🔍 Vector store seeded with {count} recipe examples.")
+                print(f"   🔍 LangChain FAISS seeded with {count} recipe examples.")
+        else:
+            print("   ⚠️ LangChain FAISS unavailable — falling back to keyword matching.")
     except Exception as e:
-        logger.warning("ChromaDB seed failed (%s).", e)
+        logger.warning("LangChain FAISS seed failed (%s).", e)
 
     # ── 3. Redis health check ─────────────────────────────────────────────────
     try:

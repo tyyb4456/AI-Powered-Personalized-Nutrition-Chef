@@ -1,22 +1,22 @@
 """
-memory/recipe_context_store.py — Phase 4
+memory/recipe_context_store.py — Phase 5
 
-Upgraded from static keyword matching to ChromaDB semantic search.
+Upgraded from ChromaDB to LangChain RAG (FAISS vector store).
 
 Retrieval flow:
-  1. Try ChromaDB vector search (semantic similarity)
-  2. If ChromaDB unavailable or returns 0 results, fall back to
-     keyword matching against RECIPE_BANK (Phase 3 behaviour)
+  1. Try LangChain FAISS semantic search
+  2. If unavailable or returns 0 results, fall back to
+     keyword matching against RECIPE_BANK (original Phase 3 behaviour)
 
-This means the system works with or without ChromaDB installed.
+System works with or without the FAISS index built.
 """
 
 from __future__ import annotations
 
 from schemas.nutrition_schemas import RecipeContext
 
-# ── Static recipe bank (unchanged from Phase 3) ───────────────────────────────
-# This is the ground truth — ChromaDB is seeded FROM this bank.
+# ── Static recipe bank ────────────────────────────────────────────────────────
+# Ground truth — LangChain FAISS is seeded FROM this bank.
 RECIPE_BANK: list[RecipeContext] = [
     RecipeContext(dish_name="Chicken Karahi", cuisine="pakistani", goal_fit="muscle_gain",
         key_proteins=["chicken"], approx_calories=520,
@@ -64,18 +64,21 @@ RECIPE_BANK: list[RecipeContext] = [
 
 def retrieve_context(goal_type: str, cuisine: str, n: int = 2) -> list[RecipeContext]:
     """
-    Retrieve n most relevant recipe examples.
+    Retrieve n most relevant recipe examples using LangChain RAG.
 
-    Tries ChromaDB semantic search first.
-    Falls back to keyword matching if ChromaDB is unavailable.
+    1. Tries LangChain FAISS semantic search
+    2. Falls back to keyword matching if unavailable
     """
-    # ── Try vector search ─────────────────────────────────────────────────────
+    # ── Try LangChain FAISS vector search ─────────────────────────────────────
     try:
-        from vector_store.chroma_store import chroma_store
-        if chroma_store.available:
+        from vector_store.langchain_store import langchain_store
+        if langchain_store.available:
             query = f"healthy {goal_type.replace('_', ' ')} {cuisine} meal"
-            results = chroma_store.search_recipes(
-                query=query, goal_type=goal_type, cuisine=cuisine, n=n,
+            results = langchain_store.search_recipes(
+                query=query,
+                goal_type=goal_type,
+                cuisine=cuisine,
+                n=n,
             )
             if results:
                 return [

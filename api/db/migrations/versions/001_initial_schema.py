@@ -105,8 +105,8 @@ def upgrade() -> None:
         "recipe_ingredients",
         sa.Column("id",        sa.String(36),  primary_key=True),
         sa.Column("recipe_id", sa.String(36),  sa.ForeignKey("recipes.id")),
-        sa.Column("name",      sa.String(100), nullable=False),
-        sa.Column("quantity",  sa.String(50),  nullable=False),
+        sa.Column("name",      sa.text(), nullable=False),
+        sa.Column("quantity",  sa.text(),  nullable=False),
     )
 
     # ── recipe_nutrition ──────────────────────────────────────────────────────

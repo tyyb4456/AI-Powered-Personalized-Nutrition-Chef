@@ -139,9 +139,9 @@ def save_learned_preferences(user_id: str, prefs: LearnedPreferences) -> None:
         data["learned_preferences"] = prefs.model_dump()
         _save_json(user_id, data)
 
-    # ── Also update ChromaDB preference embedding ─────────────────────────────
+    # ── Also update faiss preference embedding ─────────────────────────────
     try:
-        from vector_store.chroma_store import chroma_store
+        from vector_store.langchain_store import langchain_store
         pref_text = (
             f"Likes: {', '.join(prefs.liked_ingredients)}. "
             f"Dislikes: {', '.join(prefs.disliked_ingredients)}. "
@@ -149,9 +149,9 @@ def save_learned_preferences(user_id: str, prefs: LearnedPreferences) -> None:
             f"Spice: {prefs.spice_preference or 'medium'}. "
             f"Goal: {prefs.goal_refinement or 'general fitness'}."
         )
-        chroma_store.upsert_user_preferences(user_id, pref_text)
+        langchain_store.upsert_user_preferences(user_id, pref_text)
     except Exception as e:
-        logger.warning("ChromaDB preference upsert failed: %s", e)
+        logger.warning("LangChain preference upsert failed: %s", e)
 
 
 def load_learned_preferences(user_id: str) -> Optional[LearnedPreferences]:
