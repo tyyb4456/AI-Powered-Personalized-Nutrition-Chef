@@ -10,6 +10,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
+import GenerateRecipePage from './pages/GenerateRecipePage';
+import RecipesPage from './pages/RecipesPage';
 
 const queryClient = new QueryClient();
 
@@ -20,6 +22,12 @@ const Layout = ({ children }) => (
   </div>
 );
 
+const Wrap = ({ children }) => (
+  <ProtectedRoute>
+    <Layout>{children}</Layout>
+  </ProtectedRoute>
+);
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -27,24 +35,14 @@ function App() {
         <BrowserRouter>
           <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
           <Routes>
-            {/* Public */}
-            <Route path="/login" element={<LoginPage />} />
+            <Route path="/login"    element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 
-            {/* Protected */}
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Layout><DashboardPage /></Layout>
-              </ProtectedRoute>
-            } />
+            <Route path="/"                  element={<Wrap><DashboardPage /></Wrap>} />
+            <Route path="/profile"           element={<Wrap><ProfilePage /></Wrap>} />
+            <Route path="/recipes"           element={<Wrap><RecipesPage /></Wrap>} />
+            <Route path="/recipes/generate"  element={<Wrap><GenerateRecipePage /></Wrap>} />
 
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <Layout><ProfilePage /></Layout>
-              </ProtectedRoute>
-            } />
-
-            {/* Catch-all */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
