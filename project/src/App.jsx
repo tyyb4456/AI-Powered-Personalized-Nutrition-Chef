@@ -13,6 +13,7 @@ import ProfilePage from './pages/ProfilePage';
 import GenerateRecipePage from './pages/GenerateRecipePage';
 import RecipesPage from './pages/RecipesPage';
 import MealPlanPage from './pages/MealPlanPage';
+import MealLogPage from './pages/MealLogPage';
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ function App() {
             <Route path="/recipes"           element={<Wrap><RecipesPage /></Wrap>} />
             <Route path="/recipes/generate"  element={<Wrap><GenerateRecipePage /></Wrap>} />
             <Route path="/meal-plan"         element={<Wrap><MealPlanPage /></Wrap>} />
+            <Route path="/meal-log"          element={<Wrap><MealLogPage /></Wrap>} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
