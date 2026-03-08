@@ -178,6 +178,8 @@ class Recipe(Base):
     nutrition:   Mapped[RecipeNutrition | None]  = relationship("RecipeNutrition",  back_populates="recipe", uselist=False, cascade="all, delete-orphan")
     feedback:    Mapped[list[UserFeedback]]      = relationship("UserFeedback",     back_populates="recipe")
     meal_logs:   Mapped[list[MealLog]]           = relationship("MealLog",          back_populates="recipe")
+    steps: Mapped[list[RecipeStep]] = relationship("RecipeStep", back_populates="recipe", cascade="all, delete-orphan", order_by="RecipeStep.step_number")
+    explanation: Mapped[str|None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         Index("ix_recipes_cuisine_meal", "cuisine", "meal_type"),
@@ -193,6 +195,16 @@ class RecipeIngredient(Base):
     quantity:   Mapped[str]      = mapped_column(Text)        # LLM quantities can be long: "800g (about 6-7 medium), finely chopped"
 
     recipe: Mapped[Recipe] = relationship("Recipe", back_populates="ingredients")
+
+class RecipeStep(Base):
+    __tablename__ = "recipe_steps"
+
+    id:          Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    recipe_id:   Mapped[str] = mapped_column(String(36), ForeignKey("recipes.id"))
+    step_number: Mapped[int] = mapped_column(Integer)
+    instruction: Mapped[str] = mapped_column(Text)
+
+    recipe: Mapped[Recipe] = relationship("Recipe", back_populates="steps")
 
 
 class RecipeNutrition(Base):

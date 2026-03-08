@@ -21,7 +21,7 @@ from db.models import (
     User, UserProfile, UserGoal, UserMedicalCondition,
     UserAllergy, UserPreference, Recipe, RecipeIngredient,
     RecipeNutrition, MealPlan, MealPlanItem, UserFeedback,
-    MealLog, LearnedPreference,
+    MealLog, LearnedPreference, RecipeStep
 )
 from schemas.nutrition_schemas import (
     RecipeOutput, MacroSplit, MedicalCondition,
@@ -171,7 +171,7 @@ class RecipeRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def save(self, recipe: RecipeOutput, source: str = "generated") -> str:
+    def save(self, recipe: RecipeOutput, source: str = "generated", explanation: str = None) -> str:
         """
         Persist a RecipeOutput to the database.
         Returns the new recipe ID.
@@ -187,6 +187,7 @@ class RecipeRepository:
             source=source,
             generated_at=now,
             prep_time_minutes=recipe.prep_time_minutes,
+            explanation=explanation,
         )
         self.db.add(db_recipe)
 
@@ -195,6 +196,13 @@ class RecipeRepository:
             self.db.add(RecipeIngredient(
                 id=_uuid(), recipe_id=recipe_id,
                 name=ing.name, quantity=ing.quantity,
+            ))
+
+        # Steps
+        for i, step_text in enumerate(recipe.steps):
+            self.db.add(RecipeStep(
+                id=_uuid(), recipe_id=recipe_id,
+                step_number=i, instruction=step_text,
             ))
 
         # Nutrition

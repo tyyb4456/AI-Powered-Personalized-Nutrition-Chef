@@ -97,7 +97,7 @@ def list_recipes(
 
 @router.get(
     "/{recipe_id}",
-    response_model=RecipeSummary,
+    response_model=RecipeResponse,   # ← was RecipeSummary
     summary="Get a recipe by ID",
 )
 def get_recipe(

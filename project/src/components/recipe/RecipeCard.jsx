@@ -3,7 +3,7 @@
 import { Clock, ChefHat } from 'lucide-react';
 
 const RecipeCard = ({ recipe, onClick }) => {
-  const nutrition = recipe.nutrition || recipe.nutrition_facts || {};
+  const nutrition = recipe.nutrition || recipe.nutrition_facts || recipe || {};
 
   return (
     <div

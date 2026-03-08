@@ -250,7 +250,7 @@ async def generate_recipe(
 
     # ── Persist to DB ─────────────────────────────────────────────────────────
     recipe_repo = RecipeRepository(db)
-    recipe_id   = recipe_repo.save(state.final_recipe, source="generated")
+    recipe_id   = recipe_repo.save(state.final_recipe, source="generated", explanation=state.recipe_explanation)
     db.flush()
 
     logger.info("Recipe '%s' saved (id=%s) for user %s",
@@ -259,26 +259,53 @@ async def generate_recipe(
     return _build_response(state, recipe_id)
 
 
-def get_recipe_by_id(recipe_id: str, db: Session) -> Optional[RecipeSummary]:
-    """Fetch a single recipe by its DB id."""
-    from db.models import Recipe as RecipeModel, RecipeNutrition
+def get_recipe_by_id(recipe_id: str, db: Session) -> Optional[RecipeResponse]:
+    """Fetch a single recipe by its DB id — full detail including ingredients and steps."""
+    from db.models import Recipe as RecipeModel, RecipeNutrition, RecipeIngredient, RecipeStep
 
     row = db.query(RecipeModel).filter_by(id=recipe_id).first()
     if not row:
         return None
 
     nutrition = db.query(RecipeNutrition).filter_by(recipe_id=recipe_id).first()
-    return RecipeSummary(
-        recipe_id = row.id,
-        dish_name = row.name,
-        cuisine   = row.cuisine,
-        meal_type = row.meal_type,
-        calories  = nutrition.calories  if nutrition else 0,
-        protein_g = nutrition.protein_g if nutrition else 0.0,
-        carbs_g   = nutrition.carbs_g   if nutrition else 0.0,
-        fat_g     = nutrition.fat_g     if nutrition else 0.0,
+    ingredients = db.query(RecipeIngredient).filter_by(recipe_id=recipe_id).all()
+    steps = (
+        db.query(RecipeStep)
+        .filter_by(recipe_id=recipe_id)
+        .order_by(RecipeStep.step_number)
+        .all()
     )
 
+    nutrition_out = NutritionOut(
+        calories   = nutrition.calories   if nutrition else 0,
+        protein_g  = nutrition.protein_g  if nutrition else 0.0,
+        carbs_g    = nutrition.carbs_g    if nutrition else 0.0,
+        fat_g      = nutrition.fat_g      if nutrition else 0.0,
+        fiber_g    = nutrition.fiber_g    if nutrition else None,
+        sodium_mg  = nutrition.sodium_mg  if nutrition else None,
+        calcium_mg = nutrition.calcium_mg if nutrition else None,
+        iron_mg    = nutrition.iron_mg    if nutrition else None,
+        sugar_g    = nutrition.sugar_g    if nutrition else None,
+    ) if nutrition else NutritionOut(calories=0, protein_g=0, carbs_g=0, fat_g=0)
+
+    return RecipeResponse(
+        recipe_id         = row.id,
+        dish_name         = row.name,
+        cuisine           = row.cuisine,
+        meal_type         = row.meal_type,
+        prep_time_minutes = row.prep_time_minutes,
+        ingredients       = [IngredientOut(name=i.name, quantity=i.quantity) for i in ingredients],
+        steps             = [s.instruction for s in steps],
+        nutrition         = nutrition_out,
+        substitutions     = [],
+        explanation       = row.explanation,
+        validation        = ValidationOut(passed=True, calorie_check=True, protein_check=True,
+                               carbs_check=True, fat_check=True, fiber_check=True,
+                               allergen_check=True, calorie_diff_pct=0.0, notes=""),
+        calorie_target    = 0,
+        macro_split       = {},
+        from_cache        = False,
+    )
 
 def list_user_recipes(
     user_id: str,

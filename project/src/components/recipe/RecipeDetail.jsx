@@ -31,7 +31,7 @@ const RecipeDetail = ({ recipe }) => {
     }
   };
 
-  const nutrition = recipe.nutrition || recipe.nutrition_facts || {};
+  const nutrition = recipe.nutrition || recipe.nutrition_facts || recipe || {};
 
   return (
     <div className="space-y-6">

@@ -4,14 +4,16 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { BookOpen, Loader2, ChefHat, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { listRecipes } from '../api/recipes';
+import { listRecipes, getRecipeById } from '../api/recipes';
 import RecipeCard from '../components/recipe/RecipeCard';
 import RecipeDetail from '../components/recipe/RecipeDetail';
+import toast from 'react-hot-toast';
 
 const RecipesPage = () => {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['recipes', page],
@@ -22,6 +24,28 @@ const RecipesPage = () => {
   const total = data?.total || 0;
   const totalPages = Math.ceil(total / 12);
 
+  const handleCardClick = async (recipe) => {
+    setDetailLoading(true);
+    try {
+      const full = await getRecipeById(recipe.recipe_id);
+      setSelected(full);
+    } catch {
+      toast.error('Failed to load recipe details.');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // Loading spinner while fetching full recipe detail
+  if (detailLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="animate-spin text-primary-600" size={28} />
+      </div>
+    );
+  }
+
+  // Full recipe detail view
   if (selected) {
     return (
       <div className="p-6 max-w-3xl mx-auto">
@@ -96,7 +120,7 @@ const RecipesPage = () => {
               <RecipeCard
                 key={recipe.recipe_id}
                 recipe={recipe}
-                onClick={() => setSelected(recipe)}
+                onClick={() => handleCardClick(recipe)}
               />
             ))}
           </div>
