@@ -15,8 +15,16 @@ import RecipesPage from './pages/RecipesPage';
 import MealPlanPage from './pages/MealPlanPage';
 import MealLogPage from './pages/MealLogPage';
 import FoodCameraPage from './pages/FoodCameraPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 2, // 2 min cache
+      retry: 1,
+    },
+  },
+});
 
 const Layout = ({ children }) => (
   <div className="min-h-screen bg-gray-50">
@@ -48,6 +56,7 @@ function App() {
             <Route path="/meal-plan"         element={<Wrap><MealPlanPage /></Wrap>} />
             <Route path="/meal-log"          element={<Wrap><MealLogPage /></Wrap>} />
             <Route path="/food-camera"       element={<Wrap><FoodCameraPage /></Wrap>} />
+            <Route path="/analytics"         element={<Wrap><AnalyticsPage /></Wrap>} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -2,7 +2,10 @@
 
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../store/AuthContext';
-import { LogOut, Leaf, User, BookOpen, Sparkles, CalendarDays, ClipboardList, Camera } from 'lucide-react';
+import {
+  LogOut, Leaf, User, BookOpen, Sparkles,
+  CalendarDays, ClipboardList, Camera, BarChart2,
+} from 'lucide-react';
 
 const NavLink = ({ to, icon: Icon, label }) => {
   const { pathname } = useLocation();
@@ -33,27 +36,28 @@ const Navbar = () => {
 
   return (
     <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-6">
-        <Link to="/" className="flex items-center gap-2 text-primary-600 font-bold text-lg">
+      <div className="flex items-center gap-4">
+        <Link to="/" className="flex items-center gap-2 text-primary-600 font-bold text-lg flex-shrink-0">
           <Leaf size={22} />
           <span>Nutrition AI</span>
         </Link>
 
         {user && (
-          <div className="hidden sm:flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-0.5">
             <NavLink to="/recipes"          icon={BookOpen}      label="Recipes"   />
             <NavLink to="/recipes/generate" icon={Sparkles}      label="Generate"  />
             <NavLink to="/meal-plan"        icon={CalendarDays}  label="Meal Plan" />
-            <NavLink to="/meal-log"         icon={ClipboardList} label="Meal Log"  />
+            <NavLink to="/meal-log"         icon={ClipboardList} label="Log"       />
             <NavLink to="/food-camera"      icon={Camera}        label="Camera"    />
+            <NavLink to="/analytics"        icon={BarChart2}     label="Analytics" />
             <NavLink to="/profile"          icon={User}          label="Profile"   />
           </div>
         )}
       </div>
 
       {user && (
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500 hidden sm:block">{user.name}</span>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className="text-sm text-gray-500 hidden lg:block">{user.name}</span>
           <button
             onClick={handleLogout}
             className="flex items-center gap-1 text-sm text-gray-400 hover:text-red-600 transition-colors"
