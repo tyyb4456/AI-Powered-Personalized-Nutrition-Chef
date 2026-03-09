@@ -79,19 +79,23 @@ def list_feedback(
     db: Session,
     page: int = 1,
     limit: int = 20,
+    recipe_id: Optional[str] = None,
 ) -> FeedbackListResponse:
     """Return paginated feedback submitted by the user."""
     offset = (page - 1) * limit
 
+    query = db.query(UserFeedback).filter(UserFeedback.user_id == user_id)
+    if recipe_id:
+        query = query.filter(UserFeedback.recipe_id == recipe_id)
+
     rows = (
-        db.query(UserFeedback)
-          .filter_by(user_id=user_id)
+        query
           .order_by(UserFeedback.created_at.desc())
           .offset(offset)
           .limit(limit)
           .all()
     )
-    total = db.query(UserFeedback).filter_by(user_id=user_id).count()
+    total = query.count()
 
     return FeedbackListResponse(
         feedback=[

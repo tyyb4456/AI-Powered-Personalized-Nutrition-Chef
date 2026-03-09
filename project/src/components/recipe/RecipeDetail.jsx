@@ -1,27 +1,45 @@
 // src/components/recipe/RecipeDetail.jsx
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Clock, ChefHat, Lightbulb, MessageSquare, CheckCircle, Loader2 } from 'lucide-react';
 import MacroBadge from './MacroBadge';
 import StarRating from './StarRating';
-import { submitFeedback } from '../../api/feedback';
+import { submitFeedback, getFeedbackForRecipe, triggerLearning } from '../../api/feedback';
 import toast from 'react-hot-toast';
 
 const RecipeDetail = ({ recipe }) => {
   const [feedbackSent, setFeedbackSent] = useState(false);
-  const [comment, setComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [rating, setRating] = useState(0);
+  const [comment, setComment]           = useState('');
+  const [submitting, setSubmitting]     = useState(false);
+  const [rating, setRating]             = useState(0);
+
+  // Check if feedback was already submitted for this recipe
+  useEffect(() => {
+    const checkExisting = async () => {
+      try {
+        const existing = await getFeedbackForRecipe(recipe.recipe_id);
+        if (existing) setFeedbackSent(true);
+      } catch {
+        // No feedback yet — leave feedbackSent as false
+      }
+    };
+    checkExisting();
+  }, [recipe.recipe_id]);
 
   const handleFeedback = async () => {
     if (!rating) return toast.error('Please select a star rating first');
     setSubmitting(true);
     try {
-      await submitFeedback({
+      // Step 1: Save the feedback, get back feedback_id
+      const fb = await submitFeedback({
         recipe_id: recipe.recipe_id,
         rating,
         comment: comment || undefined,
       });
+
+      // Step 2: Trigger learning loop so preferences update immediately
+      await triggerLearning(fb.feedback_id);
+
       setFeedbackSent(true);
       toast.success('Feedback submitted — AI will learn from this!');
     } catch {

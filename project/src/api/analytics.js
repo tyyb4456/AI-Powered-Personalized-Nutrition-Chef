@@ -8,8 +8,14 @@ export const generateProgressReport = async () => {
 };
 
 export const getProgressReport = async () => {
-  const response = await apiClient.get('/analytics/progress');
-  return response.data;
+  try {
+    const response = await apiClient.get('/analytics/progress');
+    return response.data;
+  } catch (err) {
+    // 404 means no report yet — return null instead of throwing
+    if (err.response?.status === 404) return null;
+    throw err;
+  }
 };
 
 export const getLearnedPreferences = async () => {

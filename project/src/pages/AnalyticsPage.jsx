@@ -1,7 +1,7 @@
 // src/pages/AnalyticsPage.jsx
 
 import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';  // add useQueryClient
 import {
   BarChart2, Loader2, RefreshCw, Brain,
   TrendingUp, PieChart,
@@ -37,6 +37,7 @@ const AnalyticsPage = () => {
   const [activeTab, setActiveTab]   = useState('overview');
   const [generating, setGenerating] = useState(false);
   const { dateFrom, dateTo } = getLast7Days();
+  const queryClient = useQueryClient();  // add this
 
   // Meal logs for charts (last 7 days)
   const { data: logsData, isLoading: logsLoading } = useQuery({
@@ -58,12 +59,12 @@ const AnalyticsPage = () => {
     retry:    false,
   });
 
-  // Generate report mutation
   const reportMutation = useMutation({
     mutationFn: generateProgressReport,
     onMutate:   () => setGenerating(true),
-    onSuccess:  () => {
-      refetchReport();
+    onSuccess:  (data) => {
+      // Seed the cache with the returned report — no extra GET needed
+      queryClient.setQueryData(['progressReport'], data);
       toast.success('Progress report generated!');
       setGenerating(false);
     },
@@ -73,6 +74,7 @@ const AnalyticsPage = () => {
       setGenerating(false);
     },
   });
+
 
   const logs       = logsData?.logs || [];
   const report     = reportData;

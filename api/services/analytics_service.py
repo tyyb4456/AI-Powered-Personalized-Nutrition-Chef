@@ -141,6 +141,30 @@ def _run_progress_pipeline(
     return state.progress_report, len(logs)
 
 
+import json
+
+_REPORT_PREF_KEY = "__progress_report__"
+
+
+def _save_report_to_prefs(user_id: str, response: ProgressReportResponse, db: Session) -> None:
+    """Persist the latest progress report into user_preferences as JSON."""
+    repo = UserRepository(db)
+    repo.upsert_preference(user_id, _REPORT_PREF_KEY, json.dumps(response.model_dump()))
+
+
+def _load_report_from_prefs(user_id: str, db: Session) -> ProgressReportResponse | None:
+    """Load the last saved progress report from user_preferences. Returns None if not found."""
+    repo  = UserRepository(db)
+    prefs = repo.get_preferences(user_id)
+    raw   = prefs.get(_REPORT_PREF_KEY)
+    if not raw:
+        return None
+    try:
+        return ProgressReportResponse(**json.loads(raw))
+    except Exception:
+        return None
+
+
 async def generate_progress_report(
     user: User,
     db: Session,
@@ -150,13 +174,12 @@ async def generate_progress_report(
 
     state = _build_nutrition_state(user, db)
 
-    # Resolve calorie target: request override → DB goal → health agent default
     calorie_target = request.calorie_target
     if not calorie_target:
         goal = UserRepository(db).get_current_goal(user.id)
         calorie_target = goal.calorie_target if goal else 2000
 
-    loop   = asyncio.get_event_loop()
+    loop = asyncio.get_event_loop()
     report, log_count = await loop.run_in_executor(
         _executor,
         _run_progress_pipeline,
@@ -165,7 +188,7 @@ async def generate_progress_report(
         request.days,
     )
 
-    return ProgressReportResponse(
+    response = ProgressReportResponse(
         week_start          = report.week_start,
         week_end            = report.week_end,
         avg_adherence_pct   = report.avg_adherence_pct,
@@ -179,6 +202,15 @@ async def generate_progress_report(
         calorie_target_used = calorie_target,
     )
 
+    # ── Cache report so GET doesn't re-run the LLM ───────────────────────────
+    _save_report_to_prefs(user.id, response, db)
+
+    return response
+
+
+def get_saved_progress_report(user_id: str, db: Session) -> ProgressReportResponse | None:
+    """Return the last generated report without hitting the LLM."""
+    return _load_report_from_prefs(user_id, db)
 
 # ═══════════════════════════════════════════════════════════════
 # LEARNED PREFERENCES

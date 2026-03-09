@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/feedback", tags=["Feedback"])
 
+from typing import Optional
+
 
 # ── POST /feedback/ ───────────────────────────────────────────────────────────
 
@@ -58,19 +60,15 @@ def submit_feedback_endpoint(
 
 # ── GET /feedback/ ────────────────────────────────────────────────────────────
 
-@router.get(
-    "/",
-    response_model=FeedbackListResponse,
-    summary="List your feedback history",
-    description="Returns all feedback submitted by the authenticated user, newest first.",
-)
+@router.get("/", response_model=FeedbackListResponse)
 def list_my_feedback(
-    page:  int = Query(default=1,  ge=1),
-    limit: int = Query(default=20, ge=1, le=100),
+    page:      int          = Query(default=1, ge=1),
+    limit:     int          = Query(default=20, ge=1, le=100),
+    recipe_id: Optional[str] = Query(default=None),   # ← add this
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return list_feedback(user_id=current_user.id, db=db, page=page, limit=limit)
+    return list_feedback(user_id=current_user.id, db=db, page=page, limit=limit, recipe_id=recipe_id)
 
 
 # ── DELETE /feedback/{feedback_id} ────────────────────────────────────────────

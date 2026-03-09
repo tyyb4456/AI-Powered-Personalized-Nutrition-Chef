@@ -37,6 +37,7 @@ from services.analytics_service import (
     update_learned_preferences,
     reset_learned_preferences,
     trigger_learning,
+    get_saved_progress_report,
 )
 from db.models import User
 
@@ -49,43 +50,46 @@ router = APIRouter(prefix="/analytics", tags=["Analytics & Learning"])
 # PROGRESS REPORT
 # ═══════════════════════════════════════════════════════════════
 
+# ── POST /analytics/progress — regenerates via LLM ───────────────────────────
 @router.post(
     "/progress",
     response_model=ProgressReportResponse,
     status_code=status.HTTP_200_OK,
     summary="Generate a weekly progress report",
-    description="""
-Runs the **progress agent** (Gemini 2.5 Flash) on your meal log history.
-
-The LLM analyses:
-- Daily calorie adherence vs your target
-- Meal patterns (skipped breakfasts, weekend spikes, etc.)
-- Goal trajectory (on track / off track)
-
-Returns personalised **patterns**, **recommendations**, and a **motivational note**.
-
-⚠️ Requires at least 1 logged meal (via `POST /meal-logs/`).  
-⏱️ Typical response time: 5–10 seconds.
-""",
 )
-async def get_progress_report(
+async def generate_progress_report_endpoint(
     payload: GenerateProgressReportRequest = GenerateProgressReportRequest(),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     try:
-        return await generate_progress_report(
-            user=current_user, db=db, request=payload,
-        )
+        return await generate_progress_report(user=current_user, db=db, request=payload)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except Exception as e:
         logger.exception("Progress report failed for user %s", current_user.id)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Progress report generation failed: {str(e)}",
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Progress report generation failed: {str(e)}")
 
+
+# ── GET /analytics/progress — returns cached report, no LLM call ─────────────
+@router.get(
+    "/progress",
+    response_model=ProgressReportResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get the last generated progress report",
+)
+def get_progress_report_endpoint(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    report = get_saved_progress_report(user_id=current_user.id, db=db)
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No report generated yet. Call POST /analytics/progress first.",
+        )
+    return report
 
 # ═══════════════════════════════════════════════════════════════
 # LEARNED PREFERENCES
