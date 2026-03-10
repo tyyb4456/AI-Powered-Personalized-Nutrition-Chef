@@ -16,3 +16,8 @@ export const getRecipeById = async (recipeId) => {
   const response = await apiClient.get(`/recipes/${recipeId}`);
   return response.data;
 };
+
+export const followupRecipe = async (recipeId, prompt) => {
+  const response = await apiClient.post(`/recipes/${recipeId}/followup`, { prompt });
+  return response.data;
+};

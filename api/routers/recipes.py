@@ -17,9 +17,11 @@ from sqlalchemy.orm import Session
 from dependencies import get_db, get_current_user
 from schemas.recipe_schemas import (
     GenerateRecipeRequest, RecipeResponse, RecipeSummary, RecipeListResponse,
+    FollowupRequest, FollowupResponse,                                     # ← Phase 8
 )
 from services.recipe_service import (
     generate_recipe, get_recipe_by_id, list_user_recipes,
+    followup_recipe,                                                        # ← Phase 8
 )
 from db.models import User
 
@@ -73,6 +75,60 @@ async def generate_recipe_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Recipe generation failed: {str(e)}",
+        )
+    
+# ── POST /recipes/{recipe_id}/followup  ← Phase 8 ────────────────────────────
+
+@router.post(
+    "/{recipe_id}/followup",
+    response_model=FollowupResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Ask a question or request a modification for a generated recipe",
+    description="""
+Send a natural-language follow-up prompt after generating a recipe.
+
+The AI automatically classifies your intent and routes accordingly:
+
+| Intent | Example prompts | What happens |
+|--------|----------------|--------------|
+| **question** | "How much protein does this have?" / "Can I meal-prep this?" | Returns a direct answer — no regeneration |
+| **modify** | "Make it vegan" / "Reduce calories by 200" / "Use Indian spices instead" | Regenerates the full recipe and re-runs validation |
+| **done** | "Looks great, thanks!" | Returns a short confirmation message |
+
+The `followup_history` field in the response contains the full Q&A log.
+Pass it back on subsequent calls if you are building a stateful chat UI.
+
+⏱️ Q&A: ~2–4 seconds. Regeneration: ~8–20 seconds.
+""",
+)
+async def followup_recipe_endpoint(
+    recipe_id:    str,
+    payload:      FollowupRequest,
+    current_user: User = Depends(get_current_user),
+    db:           Session = Depends(get_db),
+):
+    """
+    Follow-up on a previously generated recipe.
+
+    - `recipe_id` must match a recipe returned by `POST /recipes/generate`.
+    - The user must own the recipe (enforced by the service layer).
+    """
+    try:
+        return await followup_recipe(
+            user      = current_user,
+            db        = db,
+            recipe_id = recipe_id,
+            prompt    = payload.prompt,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.exception(
+            "Follow-up failed for user %s, recipe %s", current_user.id, recipe_id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Follow-up failed: {str(e)}",
         )
 
 

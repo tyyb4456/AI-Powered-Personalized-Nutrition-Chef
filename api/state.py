@@ -1,9 +1,12 @@
 """
-state.py — Phase 4
+state.py — Phase 8 (Follow-up)
 
-Phase 4 addition:
-- current_recipe_id: set by recipe_agent after saving to DB,
-  consumed by feedback_agent to link feedback to the correct recipe row
+Phase 8 additions:
+  - followup_prompt       : the user's follow-up message after recipe generation
+  - followup_intent       : classified intent — "question" | "modify" | "done"
+  - followup_answer       : the answer when intent == "question"
+  - followup_modification : the regeneration instruction when intent == "modify"
+  - followup_history      : running list of Q&A turns in this session
 """
 
 from typing import Dict, Any, Optional
@@ -50,7 +53,7 @@ class NutritionState(BaseModel):
     # ── Recipe Agent ──────────────────────────────────────────
     generated_recipe:  Optional[RecipeOutput] = None
     recipe_generated:  bool                   = False
-    current_recipe_id: Optional[str]          = None   # [NEW] DB id of generated recipe
+    current_recipe_id: Optional[str]          = None   # DB id of generated recipe
 
     # ── Validation ────────────────────────────────────────────
     validation_result: Optional[ValidationResult] = None
@@ -71,6 +74,13 @@ class NutritionState(BaseModel):
     # ── Explainability ────────────────────────────────────────
     recipe_explanation: Optional[str] = None
 
+    # ── Follow-up (Phase 8) ───────────────────────────────────
+    followup_prompt:       Optional[str]       = None  # user's follow-up message
+    followup_intent:       Optional[str]       = None  # "question" | "modify" | "done"
+    followup_answer:       Optional[str]       = None  # populated for "question" intent
+    followup_modification: Optional[str]       = None  # regeneration instruction for "modify" intent
+    followup_history:      list[str]           = Field(default_factory=list)  # running Q&A log
+
     # ── Feedback ──────────────────────────────────────────────
     feedback_rating:    Optional[int] = None
     feedback_comment:   Optional[str] = None
@@ -86,44 +96,36 @@ class NutritionState(BaseModel):
     pending_log_entry: Optional[MealLogEntry]       = None
 
     # ── Pipeline Control ──────────────────────────────────────
-    retry_count:    int           = 0
-    pipeline_error: Optional[str] = None
+    retry_count: int  = 0
+    error:       Optional[str] = None
 
+
+# ═══════════════════════════════════════════════════════════════
+# WEEKLY PLAN STATE (unchanged)
+# ═══════════════════════════════════════════════════════════════
 
 class WeeklyPlanState(BaseModel):
+    """Separate state for the weekly meal plan pipeline."""
+    customer_id:    Optional[str]          = None
+    name:           Optional[str]          = None
+    age:            Optional[int]          = None
+    gender:         Optional[str]          = None
+    weight_kg:      Optional[float]        = None
+    height_cm:      Optional[float]        = None
+    activity_level: Optional[str]          = None
+    allergies:      list[str]              = Field(default_factory=list)
+    preferences:    Dict[str, Any]         = Field(default_factory=dict)
+    fitness_goal:   Optional[str]          = None
+    medical_conditions: list[MedicalCondition] = Field(default_factory=list)
+    profile_collected:  bool               = False
 
-    # ── User profile ──────────────────────────────────────────
-    name:               Optional[str]           = None
-    age:                Optional[int]           = None
-    gender:             Optional[str]           = None
-    weight_kg:          Optional[float]         = None
-    height_cm:          Optional[float]         = None
-    activity_level:     Optional[str]           = None
-    allergies:          list[str]               = Field(default_factory=list)
-    preferences:        Dict[str, Any]          = Field(default_factory=dict)
-    fitness_goal:       Optional[str]           = None
-    medical_conditions: list[MedicalCondition]  = Field(default_factory=list)
-    calorie_target:     Optional[int]           = None
-    macro_split:        Optional[MacroSplit]    = None
-    goal_type:          Optional[str]           = None
-    age_profile:        Optional[AgeProfile]    = None
-    learned_preferences: Optional[LearnedPreferences] = None
+    calorie_target: Optional[int]          = None
+    macro_split:    Optional[MacroSplit]   = None
+    goal_type:      Optional[str]          = None
+    age_profile:    Optional[AgeProfile]   = None
 
-    # ── Meal Plan Agent ───────────────────────────────────────
-    meal_plan:         Optional[MealPlan]  = None
-    plan_generated:    bool               = False
+    meal_plan:           Optional[MealPlan]          = None
+    grocery_list:        Optional[GroceryList]       = None
+    meal_prep_schedule:  Optional[MealPrepSchedule]  = None
 
-    # ── Grocery Agent ─────────────────────────────────────────
-    grocery_list:      Optional[GroceryList] = None
-    grocery_generated: bool                  = False
-
-    # ── Meal Prep Agent ───────────────────────────────────────
-    prep_schedule:     Optional[MealPrepSchedule] = None
-    prep_generated:    bool                       = False
-
-    # ── Progress Agent ────────────────────────────────────────
-    progress_report:    Optional[WeeklyProgressReport] = None
-    progress_generated: bool                           = False
-
-    # ── Pipeline control ──────────────────────────────────────
-    pipeline_error: Optional[str] = None
+    error: Optional[str] = None

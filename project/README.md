@@ -14,3 +14,17 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+import { useState, useEffect } from 'react';
+import { Clock, ChefHat, Lightbulb, MessageSquare, CheckCircle, Loader2 } from 'lucide-react';
+import MacroBadge from './MacroBadge';
+import StarRating from './StarRating';
+import { submitFeedback, getFeedbackForRecipe, triggerLearning } from '../../api/feedback';
+import toast from 'react-hot-toast';
+
+const RecipeDetail = ({ recipe }) => {
+  const [feedbackSent, setFeedbackSent] = useState(false);
+  const [comment, setComment]           = useState('');
+  const [submitting, setSubmitting]     = useState(false);
+  const [rating, setRating]             = useState(0);
+

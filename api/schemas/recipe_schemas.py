@@ -6,7 +6,7 @@ Request / response models for recipe endpoints.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Literal
 from pydantic import BaseModel, Field
 
 
@@ -28,6 +28,25 @@ class GenerateRecipeRequest(BaseModel):
 
     # Optional extra allergies for this request (merged with profile allergies)
     extra_allergies: list[str]      = Field(default_factory=list, examples=[["shellfish"]])
+
+class FollowupRequest(BaseModel):
+    """Body for POST /recipes/{recipe_id}/followup"""
+    prompt: str = Field(
+        ...,
+        min_length=1,
+        max_length=1000,
+        examples=[
+            "How much protein does this have?",
+            "Can you make it vegan?",
+            "What can I substitute for the chicken?",
+            "Reduce the calories by 200 kcal",
+        ],
+        description=(
+            "A follow-up question or modification request about the generated recipe. "
+            "The AI will automatically decide whether to answer your question or "
+            "regenerate the recipe based on your input."
+        ),
+    )
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -107,3 +126,41 @@ class RecipeListResponse(BaseModel):
     total:   int
     page:    int
     limit:   int
+
+# ═══════════════════════════════════════════════════════════════
+# FOLLOW-UP RESPONSE  ← Phase 8
+# ═══════════════════════════════════════════════════════════════
+
+class FollowupResponse(BaseModel):
+    """
+    Unified response for POST /recipes/{recipe_id}/followup
+
+    intent == "question":
+      - answer is populated with the AI's answer
+      - recipe is None
+
+    intent == "modify":
+      - recipe is populated with the fully regenerated RecipeResponse
+      - answer is None
+
+    intent == "done":
+      - answer is a short farewell message
+      - recipe is None
+
+    followup_history contains the full Q&A log for this session,
+    which the client should persist and pass back if implementing
+    a stateful multi-turn session (optional).
+    """
+    intent:           Literal["question", "modify", "done"]
+    answer:           Optional[str]           = Field(
+        default=None,
+        description="Populated when intent is 'question' or 'done'.",
+    )
+    recipe:           Optional[RecipeResponse] = Field(
+        default=None,
+        description="Populated when intent is 'modify' — the regenerated recipe.",
+    )
+    followup_history: list[str] = Field(
+        default_factory=list,
+        description="Running log of all follow-up turns in this session.",
+    )
