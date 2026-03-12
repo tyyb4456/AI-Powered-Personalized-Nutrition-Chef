@@ -6,17 +6,19 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import toast from 'react-hot-toast';
-import { Leaf, Loader2 } from 'lucide-react';
+import { Loader2, Leaf, Sun, Moon } from 'lucide-react';
 import { loginUser } from '../api/auth';
 import { useAuth } from '../store/AuthContext';
+import { useTheme } from '../store/ThemeContext';
 
 const schema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  name: z.string().min(2, 'At least 2 characters'),
+  password: z.string().min(6, 'At least 6 characters'),
 });
 
 const LoginPage = () => {
   const { login } = useAuth();
+  const { dark, toggle } = useTheme();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
@@ -24,118 +26,100 @@ const LoginPage = () => {
     resolver: zodResolver(schema),
   });
 
-    const onSubmit = async (data) => {
+  const onSubmit = async (data) => {
     setLoading(true);
-
     try {
-        const response = await loginUser(data);
-
-        login(response);
-        toast.success(`Welcome back, ${response.name}!`);
-        navigate('/');
-
+      const response = await loginUser(data);
+      login(response);
+      toast.success(`Welcome back, ${response.name}!`);
+      navigate('/');
     } catch (err) {
-
-        let message = "Incorrect username or password";
-
-        if (err.response?.data?.detail) {
-        message = err.response.data.detail;
-        }
-
-        if (err.response?.data?.message) {
-        message = err.response.data.message;
-        }
-
-        toast.error(message);
-
+      toast.error(err.response?.data?.detail || 'Incorrect username or password');
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-    };
+  };
+
+  const bg = dark ? 'bg-[#080808]' : 'bg-[#f7f6f3]';
+  const card = dark ? 'bg-[#111] border-white/8' : 'bg-white border-black/8';
+  const label = dark ? 'text-gray-400' : 'text-gray-500';
+  const heading = dark ? 'text-white' : 'text-gray-900';
+  const input = dark
+    ? 'bg-white/4 border-white/8 text-white placeholder-gray-600 focus:border-white/20 focus:bg-white/6'
+    : 'bg-black/3 border-black/10 text-gray-900 placeholder-gray-400 focus:border-black/20 focus:bg-white';
+  const btn = dark
+    ? 'bg-white text-black hover:bg-gray-100 disabled:bg-white/30 disabled:text-white/40'
+    : 'bg-gray-900 text-white hover:bg-black disabled:bg-gray-300';
+  const linkColor = dark ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-gray-900';
+  const mutedLink = dark ? 'text-gray-500' : 'text-gray-400';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center px-4">
+    <div className={`min-h-screen ${bg} flex items-center justify-center px-4 transition-colors duration-300`}>
 
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+      {/* Theme toggle */}
+      <button
+        onClick={toggle}
+        className={`fixed top-5 right-5 p-2.5 rounded-xl border transition-all ${
+          dark ? 'border-white/8 text-gray-400 hover:text-white hover:bg-white/8' : 'border-black/8 text-gray-400 hover:text-gray-900 hover:bg-black/5'
+        }`}
+      >
+        {dark ? <Sun size={14} /> : <Moon size={14} />}
+      </button>
+
+      <div className={`w-full max-w-sm border rounded-2xl p-8 transition-colors duration-300 ${card}`}>
 
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <Leaf size={32} className="text-green-600" />
-          <span className="text-2xl font-bold text-gray-900">Nutrition AI</span>
+        <div className="flex items-center gap-2.5 mb-10">
+          <div className={`p-2 rounded-xl ${dark ? 'bg-white/8' : 'bg-black/5'}`}>
+            <Leaf size={16} className={dark ? 'text-white' : 'text-gray-900'} />
+          </div>
+          <span className={`text-sm font-semibold tracking-tight ${heading}`}>
+            nutrition<span className={mutedLink}>.ai</span>
+          </span>
         </div>
 
-        <h1 className="text-xl font-semibold text-gray-900 mb-1">
-          Welcome back
-        </h1>
+        <h1 className={`text-2xl font-bold tracking-tight mb-1 ${heading}`}>Sign in</h1>
+        <p className={`text-sm mb-8 ${label}`}>Enter your credentials to continue</p>
 
-        <p className="text-sm text-gray-600 mb-6">
-          Sign in to your account
-        </p>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-
-          {/* Username */}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Username
-            </label>
-
+            <label className={`block text-xs font-medium mb-2 tracking-wide uppercase ${label}`}>Username</label>
             <input
               {...register('name')}
               type="text"
-              placeholder="Enter your username"
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+              placeholder="your_username"
+              className={`w-full px-4 py-3 border rounded-xl text-sm outline-none transition-all duration-200 ${input}`}
             />
-
-            {errors.name && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.name.message}
-              </p>
-            )}
+            {errors.name && <p className="text-red-400 text-xs mt-1.5">{errors.name.message}</p>}
           </div>
 
-          {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-
+            <label className={`block text-xs font-medium mb-2 tracking-wide uppercase ${label}`}>Password</label>
             <input
               {...register('password')}
               type="password"
-              placeholder="Enter your password"
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+              placeholder="••••••••"
+              className={`w-full px-4 py-3 border rounded-xl text-sm outline-none transition-all duration-200 ${input}`}
             />
-
-            {errors.password && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.password.message}
-              </p>
-            )}
+            {errors.password && <p className="text-red-400 text-xs mt-1.5">{errors.password.message}</p>}
           </div>
 
-          {/* Button */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 rounded-lg text-sm transition disabled:opacity-60 flex items-center justify-center gap-2"
+            className={`w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 mt-2 ${btn}`}
           >
-            {loading && <Loader2 size={16} className="animate-spin" />}
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading && <Loader2 size={14} className="animate-spin" />}
+            {loading ? 'Signing in…' : 'Sign In'}
           </button>
-
         </form>
 
-        <p className="text-sm text-gray-600 text-center mt-6">
-          Don't have an account?{' '}
-          <Link
-            to="/register"
-            className="text-green-600 font-medium hover:underline"
-          >
-            Register
+        <p className={`text-sm text-center mt-6 ${label}`}>
+          No account?{' '}
+          <Link to="/register" className={`font-medium transition-colors ${linkColor}`}>
+            Create one
           </Link>
         </p>
-
       </div>
     </div>
   );

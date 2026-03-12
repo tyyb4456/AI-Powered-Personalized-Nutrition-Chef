@@ -1,16 +1,17 @@
 // src/pages/GenerateRecipePage.jsx
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Sparkles, Loader2, ChefHat, RotateCcw } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { generateRecipe } from '../api/recipes';
 import SelectField from '../components/ui/SelectField';
 import RecipeDetail from '../components/recipe/RecipeDetail';
+import { useTheme } from '../store/ThemeContext';
 
 const GenerateRecipePage = () => {
+  const { dark } = useTheme();
   const [loading, setLoading] = useState(false);
-  const [recipe,  setRecipe]  = useState(null);
+  const [recipe, setRecipe] = useState(null);
   const { register, handleSubmit } = useForm();
 
   const onSubmit = async (data) => {
@@ -24,128 +25,120 @@ const GenerateRecipePage = () => {
       setRecipe(result);
       toast.success('Recipe generated!');
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Generation failed. Make sure your profile is complete.';
-      toast.error(msg);
+      toast.error(err.response?.data?.detail || 'Generation failed. Make sure your profile is complete.');
     } finally {
       setLoading(false);
     }
   };
 
+  const text    = dark ? 'text-white'   : 'text-gray-900';
+  const muted   = dark ? 'text-gray-500' : 'text-gray-400';
+  const card    = dark ? 'bg-white/4 border-white/8' : 'bg-white border-black/8';
+  const skeletonBase = dark ? 'bg-white/6' : 'bg-gray-100';
+  const skeletonShimmer = dark ? 'bg-white/4' : 'bg-gray-50';
+
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto px-6 py-10">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary-50 rounded-lg">
-            <Sparkles className="text-primary-600" size={24} />
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-3">
+          <div className={`p-2 rounded-xl ${dark ? 'bg-white/8' : 'bg-black/5'}`}>
+            <Sparkles size={15} className={text} />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Generate Recipe</h1>
-            <p className="text-sm text-gray-500">AI will craft a recipe based on your health profile</p>
-          </div>
+          <span className={`text-xs font-medium tracking-widest uppercase ${muted}`}>AI Recipe</span>
         </div>
-        {recipe && (
-          <button
-            onClick={() => setRecipe(null)}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <RotateCcw size={13} />
-            New recipe
-          </button>
-        )}
+        <h1 className={`text-3xl font-bold tracking-tight ${text}`}>Generate Recipe</h1>
+        <p className={`text-sm mt-1 ${muted}`}>AI will craft a recipe based on your health profile</p>
       </div>
 
-      {/* Override Form — hidden after generation */}
-      {!recipe && (
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-4">
-            <h2 className="text-sm font-semibold text-gray-700 mb-1">Override defaults</h2>
-            <p className="text-xs text-gray-400 mb-4">Leave blank to use your saved profile preferences</p>
+      <form onSubmit={handleSubmit(onSubmit)}>
+        {/* Override card */}
+        <div className={`rounded-2xl border p-6 mb-4 ${card}`}>
+          <p className={`text-sm font-semibold mb-1 ${text}`}>Override defaults</p>
+          <p className={`text-xs mb-5 ${muted}`}>Leave blank to use your saved profile preferences</p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <SelectField
-                label="Cuisine"
-                name="cuisine"
-                register={register}
-                options={[
-                  { value: 'pakistani',     label: '🇵🇰 Pakistani' },
-                  { value: 'indian',        label: '🇮🇳 Indian' },
-                  { value: 'mediterranean', label: '🫒 Mediterranean' },
-                  { value: 'chinese',       label: '🇨🇳 Chinese' },
-                  { value: 'italian',       label: '🇮🇹 Italian' },
-                  { value: 'american',      label: '🇺🇸 American' },
-                ]}
-                placeholder="From profile"
-              />
-              <SelectField
-                label="Spice Level"
-                name="spice_level"
-                register={register}
-                options={[
-                  { value: 'mild',      label: '🟢 Mild' },
-                  { value: 'medium',    label: '🟡 Medium' },
-                  { value: 'hot',       label: '🔴 Hot' },
-                  { value: 'extra_hot', label: '🌶️ Extra Hot' },
-                ]}
-                placeholder="From profile"
-              />
-              <SelectField
-                label="Meal Type"
-                name="meal_type"
-                register={register}
-                options={[
-                  { value: 'breakfast', label: '🌅 Breakfast' },
-                  { value: 'lunch',     label: '☀️ Lunch' },
-                  { value: 'dinner',    label: '🌙 Dinner' },
-                  { value: 'snack',     label: '🍎 Snack' },
-                ]}
-                placeholder="Any"
-              />
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <SelectField
+              label="Cuisine"
+              name="cuisine"
+              register={register}
+              options={[
+                { value: 'pakistani',     label: '🇵🇰 Pakistani' },
+                { value: 'indian',        label: '🇮🇳 Indian' },
+                { value: 'mediterranean', label: '🫒 Mediterranean' },
+                { value: 'chinese',       label: '🇨🇳 Chinese' },
+                { value: 'italian',       label: '🇮🇹 Italian' },
+                { value: 'american',      label: '🇺🇸 American' },
+              ]}
+              placeholder="From profile"
+            />
+            <SelectField
+              label="Spice Level"
+              name="spice_level"
+              register={register}
+              options={[
+                { value: 'mild',      label: '🟢 Mild' },
+                { value: 'medium',    label: '🟡 Medium' },
+                { value: 'hot',       label: '🔴 Hot' },
+                { value: 'extra_hot', label: '🌶️ Extra Hot' },
+              ]}
+              placeholder="From profile"
+            />
+            <SelectField
+              label="Meal Type"
+              name="meal_type"
+              register={register}
+              options={[
+                { value: 'breakfast', label: '🌅 Breakfast' },
+                { value: 'lunch',     label: '☀️ Lunch' },
+                { value: 'dinner',    label: '🌙 Dinner' },
+                { value: 'snack',     label: '🍎 Snack' },
+              ]}
+              placeholder="Any"
+            />
           </div>
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3.5 rounded-xl text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                Crafting your recipe…
-              </>
-            ) : (
-              <>
-                <ChefHat size={16} />
-                Generate Recipe
-              </>
-            )}
-          </button>
-        </form>
-      )}
+        {/* Generate button */}
+        <button
+          type="submit"
+          disabled={loading}
+          className={`w-full py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200 ${
+            dark
+              ? 'bg-white text-black hover:bg-gray-100 disabled:opacity-30'
+              : 'bg-gray-900 text-white hover:bg-black disabled:opacity-40'
+          }`}
+        >
+          {loading
+            ? <><Loader2 size={15} className="animate-spin" /> Generating… (8–20 seconds)</>
+            : <><Sparkles size={15} /> Generate Recipe</>
+          }
+        </button>
+      </form>
 
       {/* Loading skeleton */}
       {loading && (
-        <div className="mt-6 space-y-4">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-2/3 mb-3" />
-              <div className="h-3 bg-gray-100 rounded w-full mb-2" />
-              <div className="h-3 bg-gray-100 rounded w-4/5" />
-            </div>
-          ))}
+        <div className={`mt-4 rounded-2xl border p-6 animate-pulse space-y-4 ${card}`}>
+          <div className={`h-5 rounded-lg w-2/3 ${skeletonBase}`} />
+          <div className="flex gap-3">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className={`h-16 rounded-xl flex-1 ${skeletonShimmer}`} />
+            ))}
+          </div>
+          <div className={`h-3 rounded-lg w-full ${skeletonBase}`} />
+          <div className={`h-3 rounded-lg w-5/6 ${skeletonShimmer}`} />
+          <div className={`h-3 rounded-lg w-4/6 ${skeletonBase}`} />
+          <div className={`h-3 rounded-lg w-3/4 ${skeletonShimmer}`} />
         </div>
       )}
 
-      {/* Recipe — RecipeDetail owns all follow-up chat logic */}
+      {/* Result */}
       {recipe && !loading && (
-        <RecipeDetail
-          recipe={recipe}
-          onRecipeUpdate={setRecipe}
-        />
+        <div className="mt-4">
+          <RecipeDetail recipe={recipe} />
+        </div>
       )}
-
     </div>
   );
 };

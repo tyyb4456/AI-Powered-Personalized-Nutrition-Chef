@@ -2,41 +2,56 @@
 
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Sparkles, CalendarDays, ClipboardList, Camera, Leaf, Loader2, TrendingUp } from 'lucide-react';
+import { Sparkles, CalendarDays, ClipboardList, Camera, Leaf, Loader2, TrendingUp, ArrowRight } from 'lucide-react';
 import { useAuth } from '../store/AuthContext';
+import { useTheme } from '../store/ThemeContext';
 import { getMealLogs, getDailyAdherence } from '../api/mealLogs';
 import { listRecipes } from '../api/recipes';
 
 const toISODate = (d) => d.toISOString().split('T')[0];
 
-const QuickAction = ({ icon: Icon, label, desc, color, onClick }) => (
+const QuickAction = ({ icon: Icon, label, desc, accent, onClick, dark }) => (
   <button
     onClick={onClick}
-    className="bg-white rounded-xl border border-gray-200 p-5 text-left hover:border-primary-300 hover:shadow-sm transition-all group"
+    className={`group relative text-left p-5 rounded-2xl border transition-all duration-300 overflow-hidden hover:-translate-y-0.5 hover:shadow-lg ${
+      dark
+        ? 'bg-white/4 border-white/8 hover:border-white/15 hover:shadow-black/40'
+        : 'bg-white border-black/8 hover:border-black/15 hover:shadow-black/8'
+    }`}
   >
-    <div className={`inline-flex p-2.5 rounded-lg mb-3 ${color}`}>
-      <Icon size={20} className="text-white" />
+    <div
+      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+      style={{ background: `radial-gradient(circle at 0% 0%, ${accent}18 0%, transparent 60%)` }}
+    />
+    <div className="relative">
+      <div className="mb-4 inline-flex p-2.5 rounded-xl" style={{ background: `${accent}18` }}>
+        <Icon size={16} style={{ color: accent }} />
+      </div>
+      <p className={`text-sm font-semibold mb-1 ${dark ? 'text-white' : 'text-gray-900'}`}>{label}</p>
+      <p className={`text-xs ${dark ? 'text-gray-500' : 'text-gray-400'}`}>{desc}</p>
     </div>
-    <p className="text-sm font-semibold text-gray-900 group-hover:text-primary-700 transition-colors">
-      {label}
-    </p>
-    <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+    <ArrowRight
+      size={12}
+      className={`absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-0.5 ${dark ? 'text-gray-400' : 'text-gray-400'}`}
+    />
   </button>
 );
 
-const StatCard = ({ label, value, unit, color, loading }) => (
-  <div className="bg-white rounded-xl border border-gray-200 p-5">
+const StatCard = ({ label, value, unit, accent, loading, dark }) => (
+  <div className={`p-5 rounded-2xl border transition-colors duration-300 ${
+    dark ? 'bg-white/4 border-white/8' : 'bg-white border-black/8'
+  }`}>
     {loading ? (
       <div className="flex items-center justify-center h-12">
-        <Loader2 className="animate-spin text-gray-300" size={18} />
+        <Loader2 className={`animate-spin ${dark ? 'text-white/20' : 'text-gray-200'}`} size={16} />
       </div>
     ) : (
       <>
-        <p className={`text-2xl font-bold ${color}`}>
+        <p className="text-2xl font-bold tracking-tight" style={{ color: accent }}>
           {value ?? '—'}
-          {unit && <span className="text-xs font-normal text-gray-400 ml-0.5">{unit}</span>}
+          {unit && <span className={`text-xs font-normal ml-1 ${dark ? 'text-gray-500' : 'text-gray-400'}`}>{unit}</span>}
         </p>
-        <p className="text-xs text-gray-500 mt-1">{label}</p>
+        <p className={`text-xs mt-1 ${dark ? 'text-gray-500' : 'text-gray-400'}`}>{label}</p>
       </>
     )}
   </div>
@@ -44,153 +59,117 @@ const StatCard = ({ label, value, unit, color, loading }) => (
 
 const DashboardPage = () => {
   const { user } = useAuth();
-  const navigate  = useNavigate();
-  const today     = toISODate(new Date());
+  const { dark } = useTheme();
+  const navigate = useNavigate();
+  const today = toISODate(new Date());
 
   const { data: adherence, isLoading: adherenceLoading } = useQuery({
     queryKey: ['adherence', today],
-    queryFn:  () => getDailyAdherence(today),
-    retry:    false,
+    queryFn: () => getDailyAdherence(today),
+    retry: false,
   });
 
   const { data: logsData, isLoading: logsLoading } = useQuery({
     queryKey: ['mealLogs', today],
-    queryFn:  () => getMealLogs({ dateFrom: today, dateTo: today }),
-    retry:    false,
+    queryFn: () => getMealLogs({ dateFrom: today, dateTo: today }),
+    retry: false,
   });
 
   const { data: recipesData, isLoading: recipesLoading } = useQuery({
     queryKey: ['recipes', 1],
-    queryFn:  () => listRecipes({ page: 1, limit: 1 }),
-    retry:    false,
+    queryFn: () => listRecipes({ page: 1, limit: 1 }),
+    retry: false,
   });
 
-  const pct          = Math.min(adherence?.adherence_pct || 0, 100);
-  const actualCals   = adherence?.actual_calories  || 0;
-  const plannedCals  = adherence?.planned_calories || 0;
-  const mealsLogged  = logsData?.logs?.length      || 0;
-  const totalRecipes = recipesData?.total          || 0;
+  const pct         = Math.min(adherence?.adherence_pct || 0, 100);
+  const actualCals  = adherence?.actual_calories || 0;
+  const plannedCals = adherence?.planned_calories || 0;
+  const mealsLogged = logsData?.logs?.length || 0;
+  const totalRecipes = recipesData?.total || 0;
 
-  const barColor =
-    pct >= 90 ? 'bg-green-500' :
-    pct >= 60 ? 'bg-amber-400' :
-                'bg-red-400';
+  const barColor = pct >= 90 ? '#22c55e' : pct >= 60 ? '#f59e0b' : '#ef4444';
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  const text = dark ? 'text-white' : 'text-gray-900';
+  const muted = dark ? 'text-gray-500' : 'text-gray-400';
+  const card = dark ? 'bg-white/4 border-white/8' : 'bg-white border-black/8';
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto px-6 py-10">
 
-      {/* Welcome */}
-      <div className="flex items-center gap-3 mb-8">
-        <div className="p-2.5 bg-primary-50 rounded-xl">
-          <Leaf className="text-primary-600" size={26} />
+      {/* Header */}
+      <div className="mb-10">
+        <div className="flex items-center gap-2 mb-3">
+          <div className={`p-2 rounded-xl ${dark ? 'bg-white/8' : 'bg-black/5'}`}>
+            <Leaf size={15} className={text} />
+          </div>
+          <span className={`text-xs font-medium tracking-widest uppercase ${muted}`}>Dashboard</span>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'},{' '}
-            {user?.name} 👋
-          </h1>
-          <p className="text-sm text-gray-500">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </p>
-        </div>
+        <h1 className={`text-3xl font-bold tracking-tight ${text}`}>
+          {greeting}, <span className={dark ? 'text-gray-300' : 'text-gray-600'}>{user?.name}</span>
+        </h1>
+        <p className={`text-sm mt-1 ${muted}`}>
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        </p>
       </div>
 
-      {/* Today's calorie progress */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-        <div className="flex items-center justify-between mb-3">
+      {/* Calorie Progress */}
+      <div className={`rounded-2xl border p-6 mb-6 transition-colors duration-300 ${card}`}>
+        <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
-            <TrendingUp size={16} className="text-primary-600" />
-            <h2 className="text-sm font-semibold text-gray-900">Today's Calorie Progress</h2>
+            <TrendingUp size={14} className={muted} />
+            <span className={`text-xs font-medium tracking-wide uppercase ${muted}`}>Today's Progress</span>
           </div>
           <button
             onClick={() => navigate('/meal-log')}
-            className="text-xs text-primary-600 hover:underline font-medium"
+            className={`text-xs font-medium flex items-center gap-1 transition-colors ${
+              dark ? 'text-gray-500 hover:text-white' : 'text-gray-400 hover:text-gray-900'
+            }`}
           >
-            Log a meal →
+            Log meal <ArrowRight size={11} />
           </button>
         </div>
 
         {adherenceLoading ? (
-          <div className="flex items-center justify-center h-12">
-            <Loader2 className="animate-spin text-gray-300" size={18} />
+          <div className="flex items-center justify-center h-16">
+            <Loader2 className={`animate-spin ${dark ? 'text-white/20' : 'text-gray-200'}`} size={18} />
           </div>
         ) : (
           <>
-            <div className="flex items-end justify-between mb-2">
-              <span className="text-3xl font-bold text-gray-900">{actualCals}</span>
-              <span className="text-sm text-gray-400">/ {plannedCals} kcal</span>
+            <div className="flex items-baseline justify-between mb-3">
+              <span className={`text-4xl font-bold tracking-tight ${text}`}>{actualCals}</span>
+              <span className={`text-sm ${muted}`}>/ {plannedCals} kcal</span>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-3 mb-2">
+            <div className={`w-full h-1.5 rounded-full mb-2 ${dark ? 'bg-white/8' : 'bg-black/8'}`}>
               <div
-                className={`h-3 rounded-full transition-all duration-700 ${barColor}`}
-                style={{ width: `${pct}%` }}
+                className="h-1.5 rounded-full transition-all duration-700"
+                style={{ width: `${pct}%`, backgroundColor: barColor }}
               />
             </div>
-            <p className="text-xs text-gray-400">{pct.toFixed(0)}% of daily target</p>
+            <p className={`text-xs ${muted}`}>{pct.toFixed(0)}% of daily target</p>
           </>
         )}
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          label="Meals Today"
-          value={mealsLogged}
-          color="text-primary-600"
-          loading={logsLoading}
-        />
-        <StatCard
-          label="Calories Today"
-          value={actualCals}
-          unit="kcal"
-          color="text-amber-600"
-          loading={adherenceLoading}
-        />
-        <StatCard
-          label="Adherence"
-          value={`${pct.toFixed(0)}%`}
-          color={pct >= 90 ? 'text-green-600' : pct >= 60 ? 'text-amber-600' : 'text-red-500'}
-          loading={adherenceLoading}
-        />
-        <StatCard
-          label="Total Recipes"
-          value={totalRecipes}
-          color="text-blue-600"
-          loading={recipesLoading}
-        />
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        <StatCard label="Meals Today"    value={mealsLogged}           accent={dark ? '#a3a3a3' : '#6b7280'} loading={logsLoading}      dark={dark} />
+        <StatCard label="Calories"       value={actualCals} unit="kcal" accent="#f59e0b"                     loading={adherenceLoading}  dark={dark} />
+        <StatCard label="Adherence"      value={`${pct.toFixed(0)}%`}  accent={barColor}                    loading={adherenceLoading}  dark={dark} />
+        <StatCard label="Saved Recipes"  value={totalRecipes}          accent="#3b82f6"                      loading={recipesLoading}    dark={dark} />
       </div>
 
-      {/* Quick actions */}
-      <h2 className="text-sm font-semibold text-gray-700 mb-3">Quick Actions</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <QuickAction
-          icon={Sparkles}
-          label="Generate Recipe"
-          desc="AI-crafted meal for you"
-          color="bg-primary-600"
-          onClick={() => navigate('/recipes/generate')}
-        />
-        <QuickAction
-          icon={ClipboardList}
-          label="Log a Meal"
-          desc="Track what you ate"
-          color="bg-amber-500"
-          onClick={() => navigate('/meal-log')}
-        />
-        <QuickAction
-          icon={Camera}
-          label="Food Camera"
-          desc="Snap & identify food"
-          color="bg-purple-500"
-          onClick={() => navigate('/food-camera')}
-        />
-        <QuickAction
-          icon={CalendarDays}
-          label="Meal Plan"
-          desc="View your 7-day plan"
-          color="bg-blue-500"
-          onClick={() => navigate('/meal-plan')}
-        />
+      {/* Quick Actions */}
+      <div className="mb-4">
+        <span className={`text-xs font-medium tracking-widest uppercase ${muted}`}>Quick Actions</span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <QuickAction icon={Sparkles}      label="Generate Recipe" desc="AI-crafted meal"       accent="#8b5cf6" onClick={() => navigate('/recipes/generate')} dark={dark} />
+        <QuickAction icon={ClipboardList} label="Log a Meal"      desc="Track what you ate"   accent="#f59e0b" onClick={() => navigate('/meal-log')}         dark={dark} />
+        <QuickAction icon={Camera}        label="Food Camera"     desc="Snap & identify food"  accent="#ec4899" onClick={() => navigate('/food-camera')}      dark={dark} />
+        <QuickAction icon={CalendarDays}  label="Meal Plan"       desc="View 7-day plan"       accent="#3b82f6" onClick={() => navigate('/meal-plan')}        dark={dark} />
       </div>
     </div>
   );

@@ -1,10 +1,10 @@
 // src/components/ui/TagSelector.jsx
 
-import { useState } from 'react';
+import { useTheme } from '../../store/ThemeContext';
 import { X } from 'lucide-react';
 
 const TagSelector = ({ label, options, selected, onChange }) => {
-  const [open, setOpen] = useState(false);
+  const { dark } = useTheme();
 
   const toggle = (value) => {
     if (selected.includes(value)) {
@@ -16,52 +16,45 @@ const TagSelector = ({ label, options, selected, onChange }) => {
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      {label && (
+        <label className={`block text-xs font-medium mb-3 tracking-wide uppercase ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
+          {label}
+        </label>
+      )}
 
-      {/* Selected tags */}
-      <div className="flex flex-wrap gap-2 mb-2">
-        {selected.map((val) => (
-          <span
-            key={val}
-            className="inline-flex items-center gap-1 bg-primary-100 text-primary-700 text-xs px-2.5 py-1 rounded-full"
-          >
-            {val}
-            <button type="button" onClick={() => toggle(val)}>
-              <X size={12} />
-            </button>
-          </span>
-        ))}
-        {selected.length === 0 && (
-          <span className="text-sm text-gray-400">None selected</span>
-        )}
-      </div>
-
-      {/* Toggle options */}
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="text-sm text-primary-600 hover:underline"
-      >
-        {open ? 'Hide options' : 'Select options'}
-      </button>
-
-      {open && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {options.map((opt) => (
+      {/* All options as toggleable pills */}
+      <div className="flex flex-wrap gap-2">
+        {options.map((opt) => {
+          const isSelected = selected.includes(opt.value);
+          return (
             <button
               key={opt.value}
               type="button"
               onClick={() => toggle(opt.value)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                selected.includes(opt.value)
-                  ? 'bg-primary-600 text-white border-primary-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-primary-400'
+              className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium transition-all duration-200 ${
+                isSelected
+                  ? dark
+                    ? 'bg-white text-black border-white'
+                    : 'bg-gray-900 text-white border-gray-900'
+                  : dark
+                    ? 'bg-white/4 text-gray-400 border-white/8 hover:border-white/20 hover:text-white'
+                    : 'bg-transparent text-gray-500 border-black/10 hover:border-black/25 hover:text-gray-900'
               }`}
             >
               {opt.label}
+              {isSelected && (
+                <X size={10} className={dark ? 'text-black/50' : 'text-white/60'} />
+              )}
             </button>
-          ))}
-        </div>
+          );
+        })}
+      </div>
+
+      {/* Selected count */}
+      {selected.length > 0 && (
+        <p className={`text-xs mt-3 ${dark ? 'text-gray-600' : 'text-gray-400'}`}>
+          {selected.length} selected
+        </p>
       )}
     </div>
   );
