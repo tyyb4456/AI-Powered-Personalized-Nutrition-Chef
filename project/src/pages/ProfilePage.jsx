@@ -11,6 +11,15 @@ import InputField from '../components/ui/InputField';
 import SelectField from '../components/ui/SelectField';
 import TagSelector from '../components/ui/TagSelector';
 import { useTheme } from '../store/ThemeContext';
+import {
+  Nut,
+  Milk,
+  Wheat,
+  Egg,
+  Fish,
+  Bean,
+  Shell,
+} from "lucide-react";
 
 const schema = z.object({
   age: z.coerce.number().min(1).max(120).optional().or(z.literal('')),
@@ -24,13 +33,13 @@ const schema = z.object({
 });
 
 const ALLERGY_OPTIONS = [
-  { value: 'nuts',      label: '🥜 Nuts' },
-  { value: 'dairy',     label: '🥛 Dairy' },
-  { value: 'gluten',    label: '🌾 Gluten' },
-  { value: 'eggs',      label: '🥚 Eggs' },
-  { value: 'seafood',   label: '🦐 Seafood' },
-  { value: 'soy',       label: '🫘 Soy' },
-  { value: 'shellfish', label: '🦞 Shellfish' },
+  { value: 'nuts',      label: (<span className="flex items-center gap-2"><Nut size={14}/> Nuts</span>) },
+  { value: 'dairy',     label: (<span className="flex items-center gap-2"><Milk size={14}/> Dairy</span>) },
+  { value: 'gluten',    label: (<span className="flex items-center gap-2"><Wheat size={14}/> Gluten</span>) },
+  { value: 'eggs',      label: (<span className="flex items-center gap-2"><Egg size={14}/> Eggs</span>) },
+  { value: 'seafood',   label: (<span className="flex items-center gap-2"><Fish size={14}/> Seafood</span>) },
+  { value: 'soy',       label: (<span className="flex items-center gap-2"><Bean size={14}/> Soy</span>) },
+  { value: 'shellfish', label: (<span className="flex items-center gap-2"><Shell size={14}/> Shellfish</span>) },
 ];
 
 const CONDITION_OPTIONS = [

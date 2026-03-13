@@ -1,11 +1,7 @@
 // src/pages/AnalyticsPage.jsx
-
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';  // add useQueryClient
-import {
-  BarChart2, Loader2, RefreshCw, Brain,
-  TrendingUp, PieChart,
-} from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { BarChart2, Loader2, RefreshCw, Brain, TrendingUp, PieChart } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   generateProgressReport,
@@ -17,6 +13,7 @@ import AdherenceChart from '../components/analytics/AdherenceChart';
 import MacroPieChart from '../components/analytics/MacroPieChart';
 import ProgressReportCard from '../components/analytics/ProgressReportCard';
 import LearnedPreferencesCard from '../components/analytics/LearnedPreferencesCard';
+import { useTheme } from '../store/ThemeContext';
 
 const TABS = [
   { id: 'overview',    label: 'Overview',    icon: BarChart2  },
@@ -24,7 +21,6 @@ const TABS = [
   { id: 'preferences', label: 'AI Learning', icon: Brain      },
 ];
 
-// Last 7 days date range
 const getLast7Days = () => {
   const to   = new Date();
   const from = new Date();
@@ -34,25 +30,22 @@ const getLast7Days = () => {
 };
 
 const AnalyticsPage = () => {
+  const { dark } = useTheme();
   const [activeTab, setActiveTab]   = useState('overview');
   const [generating, setGenerating] = useState(false);
   const { dateFrom, dateTo } = getLast7Days();
-  const queryClient = useQueryClient();  // add this
 
-  // Meal logs for charts (last 7 days)
   const { data: logsData, isLoading: logsLoading } = useQuery({
     queryKey: ['mealLogs', 'analytics', dateFrom, dateTo],
     queryFn:  () => getMealLogs({ dateFrom, dateTo, limit: 100 }),
   });
 
-  // Progress report
   const { data: reportData, isLoading: reportLoading, refetch: refetchReport } = useQuery({
     queryKey: ['progressReport'],
     queryFn:  getProgressReport,
     retry:    false,
   });
 
-  // Learned preferences
   const { data: prefsData, isLoading: prefsLoading } = useQuery({
     queryKey: ['learnedPreferences'],
     queryFn:  getLearnedPreferences,
@@ -62,80 +55,88 @@ const AnalyticsPage = () => {
   const reportMutation = useMutation({
     mutationFn: generateProgressReport,
     onMutate:   () => setGenerating(true),
-    onSuccess:  (data) => {
-      // Seed the cache with the returned report — no extra GET needed
-      queryClient.setQueryData(['progressReport'], data);
+    onSuccess:  () => {
+      refetchReport();
       toast.success('Progress report generated!');
       setGenerating(false);
     },
     onError: (err) => {
-      const msg = err.response?.data?.detail || 'Failed to generate report. Log some meals first.';
-      toast.error(msg);
+      toast.error(err.response?.data?.detail || 'Failed to generate report. Log some meals first.');
       setGenerating(false);
     },
   });
 
+  const logs      = logsData?.logs || [];
+  const report    = reportData;
+  const hasReport = report && report.avg_adherence_pct !== undefined;
 
-  const logs       = logsData?.logs || [];
-  const report     = reportData;
-  const hasReport  = report && (report.avg_adherence_pct !== undefined);
-
-  // Build daily adherence data from logs
+  // Build daily adherence data
   const dailyMap = {};
   logs.forEach((log) => {
     if (!dailyMap[log.log_date]) {
       dailyMap[log.log_date] = {
-        log_date:         log.log_date,
-        actual_calories:  0,
-        planned_calories: 2000, // fallback
-        meals_logged:     0,
-        meals_skipped:    0,
-        protein_g:        0,
-        carbs_g:          0,
-        fat_g:            0,
+        log_date: log.log_date,
+        actual_calories: 0, planned_calories: 2000,
+        meals_logged: 0, meals_skipped: 0,
+        protein_g: 0, carbs_g: 0, fat_g: 0,
       };
     }
-    dailyMap[log.log_date].actual_calories  += log.calories  || 0;
-    dailyMap[log.log_date].protein_g        += log.protein_g || 0;
-    dailyMap[log.log_date].carbs_g          += log.carbs_g   || 0;
-    dailyMap[log.log_date].fat_g            += log.fat_g     || 0;
-    dailyMap[log.log_date].meals_logged     += 1;
+    dailyMap[log.log_date].actual_calories += log.calories  || 0;
+    dailyMap[log.log_date].protein_g       += log.protein_g || 0;
+    dailyMap[log.log_date].carbs_g         += log.carbs_g   || 0;
+    dailyMap[log.log_date].fat_g           += log.fat_g     || 0;
+    dailyMap[log.log_date].meals_logged    += 1;
   });
-
   const dailyLogs = Object.values(dailyMap).map((d) => ({
     ...d,
-    adherence_pct: d.planned_calories
-      ? (d.actual_calories / d.planned_calories) * 100
-      : 0,
+    adherence_pct: d.planned_calories ? (d.actual_calories / d.planned_calories) * 100 : 0,
   }));
 
+  // Theme tokens
+  const text    = dark ? 'text-white'    : 'text-gray-900';
+  const muted   = dark ? 'text-gray-500' : 'text-gray-400';
+  const subtext = dark ? 'text-gray-400' : 'text-gray-500';
+  const card    = dark ? 'bg-white/4 border-white/8'  : 'bg-white border-black/8';
+  const tabBar  = dark ? 'bg-white/5'                 : 'bg-black/5';
+  const tabActive = dark
+    ? 'bg-white/10 text-white'
+    : 'bg-white text-gray-900 shadow-sm';
+  const tabIdle = dark
+    ? 'text-gray-500 hover:text-gray-300'
+    : 'text-gray-500 hover:text-gray-700';
+  const genBtn  = dark
+    ? 'bg-white text-black hover:bg-gray-100 disabled:opacity-30'
+    : 'bg-gray-900 text-white hover:bg-black disabled:opacity-40';
+  const emptyCard = dark ? 'bg-white/3 border-white/6' : 'bg-gray-50 border-black/6';
+  const statCell  = dark ? 'bg-white/6' : 'bg-gray-50';
+  const sectionLabel = `text-xs font-semibold tracking-widest uppercase mb-1 flex items-center gap-2 ${muted}`;
+
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto px-6 py-10">
 
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-primary-50 rounded-lg">
-          <BarChart2 className="text-primary-600" size={24} />
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-3">
+          <div className={`p-2 rounded-xl ${dark ? 'bg-white/8' : 'bg-black/5'}`}>
+            <BarChart2 size={15} className={text} />
+          </div>
+          <span className={`text-xs font-medium tracking-widest uppercase ${muted}`}>Analytics</span>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-          <p className="text-sm text-gray-500">Your nutrition progress at a glance</p>
-        </div>
+        <h1 className={`text-3xl font-bold tracking-tight ${text}`}>Nutrition Progress</h1>
+        <p className={`text-sm mt-1 ${muted}`}>Your nutrition progress at a glance</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
+      <div className={`flex gap-1 p-1 rounded-2xl mb-6 w-fit ${tabBar}`}>
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
-              activeTab === id
-                ? 'bg-white text-primary-700 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+            className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl transition-all duration-200 ${
+              activeTab === id ? tabActive : tabIdle
             }`}
           >
-            <Icon size={15} />
+            <Icon size={14} />
             {label}
           </button>
         ))}
@@ -143,35 +144,28 @@ const AnalyticsPage = () => {
 
       {/* ── TAB: Overview ── */}
       {activeTab === 'overview' && (
-        <div className="space-y-5">
-
+        <div className="space-y-4">
           {logsLoading ? (
             <div className="flex items-center justify-center h-48">
-              <Loader2 className="animate-spin text-primary-600" size={26} />
+              <Loader2 className={`animate-spin ${dark ? 'text-white/30' : 'text-gray-300'}`} size={24} />
             </div>
           ) : (
             <>
               {/* Calorie Adherence */}
-              <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <div className="flex items-center gap-2 mb-1">
-                  <TrendingUp size={16} className="text-primary-600" />
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    Calorie Adherence — Last 7 Days
-                  </h3>
+              <div className={`rounded-2xl border p-5 ${card}`}>
+                <div className={`${sectionLabel}`}>
+                  <TrendingUp size={13} /> Calorie Adherence — Last 7 Days
                 </div>
-                <p className="text-xs text-gray-400 mb-4">
+                <p className={`text-xs mb-4 ${dark ? 'text-gray-600' : 'text-gray-400'}`}>
                   Green = ≥90% · Amber = 60–89% · Red = &lt;60%
                 </p>
                 <AdherenceChart logs={dailyLogs} />
               </div>
 
               {/* Macro Split */}
-              <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <PieChart size={16} className="text-primary-600" />
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    Macro Split — Last 7 Days
-                  </h3>
+              <div className={`rounded-2xl border p-5 ${card}`}>
+                <div className={sectionLabel}>
+                  <PieChart size={13} /> Macro Split — Last 7 Days
                 </div>
                 <MacroPieChart logs={logs} />
               </div>
@@ -184,7 +178,7 @@ const AnalyticsPage = () => {
                       label: 'Meals Logged',
                       value: logs.length,
                       unit: '',
-                      color: 'text-primary-600',
+                      color: 'text-blue-400',
                     },
                     {
                       label: 'Avg Daily Cals',
@@ -192,27 +186,27 @@ const AnalyticsPage = () => {
                         ? Math.round(dailyLogs.reduce((s, d) => s + d.actual_calories, 0) / dailyLogs.length)
                         : 0,
                       unit: 'kcal',
-                      color: 'text-amber-600',
+                      color: 'text-amber-400',
                     },
                     {
                       label: 'Total Protein',
                       value: Math.round(logs.reduce((s, l) => s + (l.protein_g || 0), 0)),
                       unit: 'g',
-                      color: 'text-blue-600',
+                      color: 'text-green-400',
                     },
                     {
                       label: 'Days Tracked',
                       value: dailyLogs.length,
-                      unit: '/ 7',
-                      color: 'text-green-600',
+                      unit: '',
+                      color: 'text-purple-400',
                     },
                   ].map(({ label, value, unit, color }) => (
-                    <div key={label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+                    <div key={label} className={`rounded-2xl border p-4 text-center ${card}`}>
                       <p className={`text-2xl font-bold ${color}`}>
                         {value}
-                        <span className="text-xs font-normal text-gray-400 ml-0.5">{unit}</span>
+                        {unit && <span className={`text-xs font-normal ml-0.5 ${muted}`}>{unit}</span>}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">{label}</p>
+                      <p className={`text-xs mt-0.5 ${muted}`}>{label}</p>
                     </div>
                   ))}
                 </div>
@@ -224,40 +218,36 @@ const AnalyticsPage = () => {
 
       {/* ── TAB: AI Report ── */}
       {activeTab === 'report' && (
-        <div className="space-y-5">
-
-          {/* Generate button */}
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">
-              {hasReport
-                ? `Report for week of ${report.week_start} – ${report.week_end}`
-                : 'No report generated yet'}
+            <p className={`text-sm ${subtext}`}>
+              AI-generated summary of your nutrition adherence and trends.
             </p>
             <button
               onClick={() => reportMutation.mutate()}
-              disabled={generating}
-              className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors disabled:opacity-60"
+              disabled={generating || reportLoading}
+              className={`flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl transition-all duration-200 ${genBtn}`}
             >
               {generating
-                ? <><Loader2 size={14} className="animate-spin" /> Generating...</>
-                : <><RefreshCw size={14} /> {hasReport ? 'Regenerate' : 'Generate Report'}</>
+                ? <><Loader2 size={13} className="animate-spin" /> Generating...</>
+                : <><RefreshCw size={13} /> {hasReport ? 'Regenerate' : 'Generate Report'}</>
               }
             </button>
           </div>
 
           {reportLoading || generating ? (
             <div className="flex items-center justify-center h-48">
-              <Loader2 className="animate-spin text-primary-600" size={26} />
+              <Loader2 className={`animate-spin ${dark ? 'text-white/30' : 'text-gray-300'}`} size={24} />
             </div>
           ) : hasReport ? (
             <ProgressReportCard report={report} />
           ) : (
-            <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
-              <TrendingUp size={40} className="mx-auto text-gray-200 mb-3" />
-              <p className="text-gray-500 font-medium">No report yet</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Log at least one meal, then generate your report
-              </p>
+            <div className={`text-center py-16 rounded-2xl border ${emptyCard}`}>
+              <div className={`inline-flex p-4 rounded-2xl mb-3 ${dark ? 'bg-white/5' : 'bg-black/4'}`}>
+                <TrendingUp size={28} className={muted} />
+              </div>
+              <p className={`font-semibold mb-1 ${text}`}>No report yet</p>
+              <p className={`text-sm ${muted}`}>Log at least one meal, then generate your report</p>
             </div>
           )}
         </div>
@@ -265,14 +255,13 @@ const AnalyticsPage = () => {
 
       {/* ── TAB: AI Learning ── */}
       {activeTab === 'preferences' && (
-        <div className="space-y-5">
-          <p className="text-sm text-gray-500">
+        <div className="space-y-4">
+          <p className={`text-sm ${subtext}`}>
             Every time you rate a recipe, the AI updates these preferences to personalise future recipes.
           </p>
-
           {prefsLoading ? (
             <div className="flex items-center justify-center h-48">
-              <Loader2 className="animate-spin text-primary-600" size={26} />
+              <Loader2 className={`animate-spin ${dark ? 'text-white/30' : 'text-gray-300'}`} size={24} />
             </div>
           ) : (
             <LearnedPreferencesCard preferences={prefsData} />

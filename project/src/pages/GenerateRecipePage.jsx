@@ -7,6 +7,9 @@ import { generateRecipe } from '../api/recipes';
 import SelectField from '../components/ui/SelectField';
 import RecipeDetail from '../components/recipe/RecipeDetail';
 import { useTheme } from '../store/ThemeContext';
+import { 
+  Utensils, Flame, Sun, Moon, Apple, Coffee 
+} from 'lucide-react';
 
 const GenerateRecipePage = () => {
   const { dark } = useTheme();
@@ -73,30 +76,30 @@ const GenerateRecipePage = () => {
               ]}
               placeholder="From profile"
             />
-            <SelectField
-              label="Spice Level"
-              name="spice_level"
-              register={register}
-              options={[
-                { value: 'mild',      label: '🟢 Mild' },
-                { value: 'medium',    label: '🟡 Medium' },
-                { value: 'hot',       label: '🔴 Hot' },
-                { value: 'extra_hot', label: '🌶️ Extra Hot' },
-              ]}
-              placeholder="From profile"
-            />
-            <SelectField
-              label="Meal Type"
-              name="meal_type"
-              register={register}
-              options={[
-                { value: 'breakfast', label: '🌅 Breakfast' },
-                { value: 'lunch',     label: '☀️ Lunch' },
-                { value: 'dinner',    label: '🌙 Dinner' },
-                { value: 'snack',     label: '🍎 Snack' },
-              ]}
-              placeholder="Any"
-            />
+<SelectField
+  label="Spice Level"
+  name="spice_level"
+  register={register}
+  options={[
+    { value: 'mild',      label: (<span className="flex items-center gap-2"><Flame size={14}/> Mild</span>) },
+    { value: 'medium',    label: (<span className="flex items-center gap-2"><Flame size={14}/> Medium</span>) },
+    { value: 'hot',       label: (<span className="flex items-center gap-2"><Flame size={14}/> Hot</span>) },
+    { value: 'extra_hot', label: (<span className="flex items-center gap-2"><Flame size={14}/> Extra Hot</span>) },
+  ]}
+  placeholder="From profile"
+/>
+<SelectField
+  label="Meal Type"
+  name="meal_type"
+  register={register}
+  options={[
+    { value: 'breakfast', label: (<span className="flex items-center gap-2"><Coffee size={14}/> Breakfast</span>) },
+    { value: 'lunch',     label: (<span className="flex items-center gap-2"><Sun size={14}/> Lunch</span>) },
+    { value: 'dinner',    label: (<span className="flex items-center gap-2"><Moon size={14}/> Dinner</span>) },
+    { value: 'snack',     label: (<span className="flex items-center gap-2"><Apple size={14}/> Snack</span>) },
+  ]}
+  placeholder="Any"
+/>
           </div>
         </div>
 

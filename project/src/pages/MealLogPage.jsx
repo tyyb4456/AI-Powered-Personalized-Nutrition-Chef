@@ -1,28 +1,26 @@
 // src/pages/MealLogPage.jsx
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ClipboardList, ChevronLeft, ChevronRight, Loader2, UtensilsCrossed } from 'lucide-react';
+import { ClipboardList, ChevronLeft, ChevronRight, Loader2, UtensilsCrossed, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { logMeal, getMealLogs, deleteMealLog } from '../api/mealLogs';
 import LogMealForm from '../components/meallog/LogMealForm';
 import LogEntry from '../components/meallog/LogEntry';
 import DailyProgress from '../components/meallog/DailyProgress';
+import { useTheme } from '../store/ThemeContext';
 
-// Format date as YYYY-MM-DD
-const toISODate = (date) => date.toISOString().split('T')[0];
-
+const toISODate    = (date)    => date.toISOString().split('T')[0];
 const formatDisplay = (isoDate) => {
   const d = new Date(isoDate + 'T00:00:00');
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 };
 
 const MealLogPage = () => {
+  const { dark } = useTheme();
   const [selectedDate, setSelectedDate] = useState(toISODate(new Date()));
   const [showForm, setShowForm]         = useState(false);
   const queryClient = useQueryClient();
 
-  // Fetch logs for selected date
   const { data, isLoading } = useQuery({
     queryKey: ['mealLogs', selectedDate],
     queryFn: () => getMealLogs({ dateFrom: selectedDate, dateTo: selectedDate }),
@@ -30,27 +28,24 @@ const MealLogPage = () => {
 
   const logs = data?.logs || [];
 
-  // Log meal mutation
   const logMutation = useMutation({
     mutationFn: logMeal,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mealLogs', selectedDate] });
-      queryClient.invalidateQueries({ queryKey: ['adherence',  selectedDate] });
+      queryClient.invalidateQueries({ queryKey: ['adherence', selectedDate] });
       toast.success('Meal logged!');
       setShowForm(false);
     },
     onError: (err) => {
-      const msg = err.response?.data?.detail || 'Failed to log meal.';
-      toast.error(msg);
+      toast.error(err.response?.data?.detail || 'Failed to log meal.');
     },
   });
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: deleteMealLog,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mealLogs', selectedDate] });
-      queryClient.invalidateQueries({ queryKey: ['adherence',  selectedDate] });
+      queryClient.invalidateQueries({ queryKey: ['adherence', selectedDate] });
       toast.success('Log deleted');
     },
     onError: () => toast.error('Failed to delete log'),
@@ -65,72 +60,99 @@ const MealLogPage = () => {
 
   const isToday = selectedDate === toISODate(new Date());
 
+  // Theme tokens
+  const text    = dark ? 'text-white'    : 'text-gray-900';
+  const muted   = dark ? 'text-gray-500' : 'text-gray-400';
+  const subtext = dark ? 'text-gray-300' : 'text-gray-600';
+  const card    = dark ? 'bg-white/4 border-white/8'  : 'bg-white border-black/8';
+  const divider = dark ? 'border-white/6'              : 'border-black/5';
+  const navBtn  = dark
+    ? 'hover:bg-white/6 text-gray-400 hover:text-white disabled:opacity-20'
+    : 'hover:bg-black/5 text-gray-500 hover:text-gray-900 disabled:opacity-30';
+  const addBtn  = dark
+    ? 'bg-white text-black hover:bg-gray-100'
+    : 'bg-gray-900 text-white hover:bg-black';
+  const cancelBtn = dark
+    ? 'text-gray-400 hover:text-white'
+    : 'text-gray-500 hover:text-gray-700';
+  const formBg  = dark ? 'bg-white/3 border-white/8'  : 'bg-gray-50 border-black/6';
+  const macroCell = dark ? 'bg-white/6' : 'bg-gray-50';
+  const logFirstBtn = dark
+    ? 'text-gray-400 hover:text-white'
+    : 'text-gray-500 hover:text-gray-700';
+  const todayBadge = dark
+    ? 'bg-white/8 text-gray-300'
+    : 'bg-black/5 text-gray-500';
+
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto px-6 py-10">
 
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-primary-50 rounded-lg">
-          <ClipboardList className="text-primary-600" size={24} />
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-3">
+          <div className={`p-2 rounded-xl ${dark ? 'bg-white/8' : 'bg-black/5'}`}>
+            <ClipboardList size={15} className={text} />
+          </div>
+          <span className={`text-xs font-medium tracking-widest uppercase ${muted}`}>Meal Log</span>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Meal Log</h1>
-          <p className="text-sm text-gray-500">Track what you actually eat</p>
-        </div>
+        <h1 className={`text-3xl font-bold tracking-tight ${text}`}>Track Your Meals</h1>
+        <p className={`text-sm mt-1 ${muted}`}>Log what you actually eat each day</p>
       </div>
 
       {/* Date Navigator */}
-      <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3 mb-5">
+      <div className={`flex items-center justify-between rounded-2xl border px-4 py-3 mb-4 ${card}`}>
         <button
           onClick={() => changeDate(-1)}
-          className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+          className={`p-1.5 rounded-xl transition-all duration-200 ${navBtn}`}
         >
-          <ChevronLeft size={18} className="text-gray-600" />
+          <ChevronLeft size={18} />
         </button>
-
         <div className="text-center">
-          <p className="text-sm font-semibold text-gray-900">{formatDisplay(selectedDate)}</p>
+          <p className={`text-sm font-semibold ${text}`}>{formatDisplay(selectedDate)}</p>
           {isToday && (
-            <span className="text-xs text-primary-600 font-medium">Today</span>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full mt-0.5 inline-block ${todayBadge}`}>
+              Today
+            </span>
           )}
         </div>
-
         <button
           onClick={() => changeDate(1)}
           disabled={isToday}
-          className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30"
+          className={`p-1.5 rounded-xl transition-all duration-200 ${navBtn}`}
         >
-          <ChevronRight size={18} className="text-gray-600" />
+          <ChevronRight size={18} />
         </button>
       </div>
 
       {/* Daily Progress */}
-      <div className="mb-5">
+      <div className="mb-4">
         <DailyProgress date={selectedDate} />
       </div>
 
-      {/* Log entries */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+      {/* Log entries card */}
+      <div className={`rounded-2xl border p-5 mb-4 ${card}`}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-900">
-            Meals Logged
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-semibold tracking-widest uppercase ${muted}`}>Meals Logged</span>
             {logs.length > 0 && (
-              <span className="ml-2 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${dark ? 'bg-white/8 text-gray-400' : 'bg-black/5 text-gray-500'}`}>
                 {logs.length}
               </span>
             )}
-          </h2>
+          </div>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="text-sm text-primary-600 font-medium hover:underline"
+            className={`flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-xl transition-all duration-200 ${
+              showForm ? cancelBtn : addBtn
+            }`}
           >
-            {showForm ? 'Cancel' : '+ Add Meal'}
+            {showForm ? 'Cancel' : <><Plus size={13} /> Add Meal</>}
           </button>
         </div>
 
         {/* Inline form */}
         {showForm && (
-          <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-4">
+          <div className={`rounded-xl border p-4 mb-4 ${formBg}`}>
             <LogMealForm
               date={selectedDate}
               onSuccess={(data) => logMutation.mutateAsync(data)}
@@ -141,20 +163,22 @@ const MealLogPage = () => {
         {/* Loading */}
         {isLoading && (
           <div className="flex items-center justify-center h-24">
-            <Loader2 className="animate-spin text-primary-600" size={22} />
+            <Loader2 className={`animate-spin ${dark ? 'text-white/30' : 'text-gray-300'}`} size={22} />
           </div>
         )}
 
         {/* Empty */}
         {!isLoading && logs.length === 0 && !showForm && (
           <div className="text-center py-10">
-            <UtensilsCrossed size={32} className="mx-auto text-gray-200 mb-2" />
-            <p className="text-sm text-gray-400">No meals logged for this day</p>
+            <div className={`inline-flex p-3 rounded-2xl mb-3 ${dark ? 'bg-white/5' : 'bg-black/4'}`}>
+              <UtensilsCrossed size={24} className={muted} />
+            </div>
+            <p className={`text-sm mb-1 ${subtext}`}>No meals logged for this day</p>
             <button
               onClick={() => setShowForm(true)}
-              className="mt-3 text-sm text-primary-600 font-medium hover:underline"
+              className={`text-sm font-semibold mt-2 transition-colors ${logFirstBtn}`}
             >
-              Log your first meal
+              Log your first meal →
             </button>
           </div>
         )}
@@ -173,23 +197,23 @@ const MealLogPage = () => {
         )}
       </div>
 
-      {/* Daily macro summary */}
+      {/* Daily Totals */}
       {logs.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Daily Totals</h3>
+        <div className={`rounded-2xl border p-5 ${card}`}>
+          <span className={`text-xs font-semibold tracking-widest uppercase mb-4 block ${muted}`}>Daily Totals</span>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: 'Calories', value: logs.reduce((s, l) => s + (l.calories  || 0), 0), unit: 'kcal', color: 'text-amber-600'  },
-              { label: 'Protein',  value: logs.reduce((s, l) => s + (l.protein_g || 0), 0), unit: 'g',    color: 'text-blue-600'   },
-              { label: 'Carbs',    value: logs.reduce((s, l) => s + (l.carbs_g   || 0), 0), unit: 'g',    color: 'text-orange-600' },
-              { label: 'Fat',      value: logs.reduce((s, l) => s + (l.fat_g     || 0), 0), unit: 'g',    color: 'text-purple-600' },
+              { label: 'Calories', value: logs.reduce((s, l) => s + (l.calories  || 0), 0), unit: 'kcal', color: 'text-amber-400'  },
+              { label: 'Protein',  value: logs.reduce((s, l) => s + (l.protein_g || 0), 0), unit: 'g',    color: 'text-blue-400'   },
+              { label: 'Carbs',    value: logs.reduce((s, l) => s + (l.carbs_g   || 0), 0), unit: 'g',    color: 'text-orange-400' },
+              { label: 'Fat',      value: logs.reduce((s, l) => s + (l.fat_g     || 0), 0), unit: 'g',    color: 'text-purple-400' },
             ].map(({ label, value, unit, color }) => (
-              <div key={label} className="bg-gray-50 rounded-xl p-3 text-center">
+              <div key={label} className={`rounded-xl p-3 text-center ${macroCell}`}>
                 <p className={`text-xl font-bold ${color}`}>
                   {typeof value === 'number' ? value.toFixed(value % 1 === 0 ? 0 : 1) : '—'}
-                  <span className="text-xs font-normal text-gray-400 ml-0.5">{unit}</span>
+                  <span className={`text-xs font-normal ml-0.5 ${muted}`}>{unit}</span>
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+                <p className={`text-xs mt-0.5 ${muted}`}>{label}</p>
               </div>
             ))}
           </div>

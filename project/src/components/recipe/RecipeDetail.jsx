@@ -10,6 +10,14 @@ import { submitFeedback, getFeedbackForRecipe, triggerLearning } from '../../api
 import { followupRecipe } from '../../api/recipes';
 import { useTheme } from '../../store/ThemeContext';
 import toast from 'react-hot-toast';
+import { 
+  FiFeather,
+  FiZap, 
+  FiClock, 
+  FiRefreshCw, 
+  FiHelpCircle, 
+  FiPackage 
+} from "react-icons/fi";
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 // Parses the AI explanation which comes back with **bold**, numbered lists,
@@ -221,12 +229,12 @@ const RecipeDetail = ({ recipe: initialRecipe, onRecipeUpdate }) => {
   const sectionLabel = `text-xs font-medium tracking-widest uppercase mb-4 flex items-center gap-2 ${muted}`;
 
   const CHIPS = [
-    { emoji: '🌱', label: 'Make it vegan' },
-    { emoji: '🔥', label: 'Reduce calories by 200' },
-    { emoji: '⏱️', label: 'Faster prep time' },
-    { emoji: '🔄', label: 'Swap the protein' },
-    { emoji: '❓', label: 'What can I substitute?' },
-    { emoji: '📦', label: 'Can I meal-prep this?' },
+    { icon: FiFeather, label: "Make it vegan" },
+    { icon: FiZap, label: "Reduce calories by 200" },
+    { icon: FiClock, label: "Faster prep time" },
+    { icon: FiRefreshCw, label: "Swap the protein" },
+    { icon: FiHelpCircle, label: "What can I substitute?" },
+    { icon: FiPackage, label: "Can I meal-prep this?" },
   ];
 
   return (
@@ -339,16 +347,20 @@ const RecipeDetail = ({ recipe: initialRecipe, onRecipeUpdate }) => {
 
         {chatHistory.length === 0 && (
           <div className="px-4 pb-4 flex flex-wrap gap-2">
-            {CHIPS.map(({ emoji, label }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => { setFollowupInput(label); inputRef.current?.focus(); }}
-                className={`text-xs border px-3 py-1.5 rounded-full transition-all duration-200 ${chipCls}`}
-              >
-                {emoji} {label}
-              </button>
-            ))}
+           {CHIPS.map(({ icon: Icon, label }) => (
+  <button
+    key={label}
+    type="button"
+    onClick={() => {
+      setFollowupInput(label);
+      inputRef.current?.focus();
+    }}
+    className={`flex items-center gap-1.5 text-xs border px-3 py-1.5 rounded-full transition-all duration-200 ${chipCls}`}
+  >
+    <Icon size={14} />
+    {label}
+  </button>
+))}
           </div>
         )}
       </div>
